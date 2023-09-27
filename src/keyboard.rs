@@ -1,11 +1,13 @@
 pub trait KeyboardPoll {
-	fn poll(&mut self) -> Option<KeyEvent>;
+	async fn poll(&mut self);
 }
 
+#[derive(Default)]
 pub enum KeyEvent {
-	Pressed(KeyCode),
-	Released(KeyCode),
-	Held(KeyCode),
+	Pressed,
+	#[default]
+	Released,
+	Held,
 }
 
 pub enum KeyCode {

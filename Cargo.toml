@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "main", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"] }
-embassy-futures  = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
-embassy-sync     = { git = "https://github.com/embassy-rs/embassy", branch = "main", features = ["defmt"] }
-embassy-usb      = { git = "https://github.com/embassy-rs/embassy", branch = "main", optional = true, features = ["defmt", "msos-descriptor",] }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-executor-v0.3.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"] }
+embassy-futures  = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-futures-v0.1.0" }
+embassy-sync     = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-sync-v0.3.0", features = ["defmt"] }
+embassy-usb      = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-sync-v0.3.0", optional = true, features = ["defmt", "msos-descriptor",] }
 
-embassy-rp    = { git = "https://github.com/embassy-rs/embassy", branch = "main", optional = true}
-embassy-nrf   = { git = "https://github.com/embassy-rs/embassy", branch = "main", optional = true, features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time"]}
-embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", branch = "main", optional = true}
+embassy-rp    = { git = "https://github.com/embassy-rs/embassy", optional = true, tag = "embassy-sync-v0.3.0"}
+embassy-nrf   = { git = "https://github.com/embassy-rs/embassy", optional = true, tag = "embassy-sync-v0.3.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time"]}
+embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", optional = true, tag = "embassy-sync-v0.3.0"}
 # esp-hal = { version = "0.12.0", optional = true }
 # TODO: Add esp-wifi and esp-hal
 
@@ -32,6 +32,7 @@ embedded-hal-async = { version = "1.0.0-rc.1", optional = true }
 embedded-hal-bus = { version = "0.1.0-rc.1" }
 
 usbd-hid = "0.6.0"
+embedded-alloc = "0.5.0"
 
 [features]
 default = ["nrf", "nrf52840", "nightly"]
@@ -48,6 +49,3 @@ nightly = [
 	"embassy-executor/nightly",
 	"embassy-nrf/nightly",
 ]
-
-[dev-dependencies]
-test = "0.0.1"

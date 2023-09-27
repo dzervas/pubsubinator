@@ -1,3 +1,7 @@
+use core::convert::Infallible;
+
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use crate::keyboard::*;
 
@@ -6,30 +10,38 @@ pub enum MatrixDirection {
 	Row2Col,
 }
 
-// pub struct Matrix<'a, const I: usize, const O: usize> {
-pub struct Matrix<I: InputPin<Error = ()>, O: OutputPin<Error = ()>> {
-	// inputs: &'a [dyn InputPin<Error = ()>; I],
-	// outputs: &'a [dyn OutputPin<Error = ()>; O],
-	inputs: [I; 3],
-	outputs: [O; 3],
-	keymap: [KeyCode; 9],
-	last_state: [Option<KeyEvent>; 9],
-	direction: MatrixDirection,
+pub type InputPinArray = Vec<Box<dyn InputPin<Error = ()>>>;
+pub type OutputPinArray = Vec<Box<dyn OutputPin<Error = ()>>>;
+// pub type InputPinArray = &'static [Box<dyn InputPin<Error = ()>>];
+// pub type OutputPinArray = &'static [Box<dyn OutputPin<Error = ()>>];
+
+// TODO: Dynamic size
+pub struct Matrix<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> {
+	// TODO: Use slices instead of vectors
+	// inputs: Vec<Box<dyn InputPin<Error = ()>>>,
+	// outputs: Vec<Box<dyn OutputPin<Error = ()>>>,
+	// inputs: InputPinArray,
+	// outputs: OutputPinArray,
+	// TODO: Make these private and create platform-specific constructors
+	pub inputs: Vec<I>,
+	pub outputs: Vec<O>,
+	pub keymap: Vec<KeyCode>,
+	pub last_state: Vec<KeyEvent>,
+	pub direction: MatrixDirection,
 }
 
-// impl<const I: usize, const O: usize> Matrix<I, O> {
-impl<I: InputPin<Error = ()>, O: OutputPin<Error = ()>> Matrix<I, O> {
-	pub fn new(inputs: [I; 3], outputs: [O; 3], keymap: [KeyCode; 9], direction: MatrixDirection) -> Self {
-		let last_state: [Option<KeyEvent>; 9] = Default::default();
-
-		Matrix {
-			inputs,
-			outputs,
-			keymap,
-			last_state,
-			direction,
-		}
-	}
+impl<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Matrix<I, O> {
+	// pub fn new(inputs: Vec<Box<dyn InputPin<Error = ()>>>, outputs: Vec<Box<dyn OutputPin<Error = ()>>>, keymap: Vec<KeyCode>, direction: MatrixDirection) -> Self {
+	// pub fn new(inputs: InputPinArray, outputs: OutputPinArray, keymap: Vec<KeyCode>, direction: MatrixDirection) -> Self {
+	// pub fn new(inputs: InputPinArray, outputs: OutputPinArray, keymap: Vec<KeyCode>, direction: MatrixDirection) -> Self {
+	// 	Matrix {
+	// 		inputs,
+	// 		outputs,
+	// 		keymap,
+	// 		last_state: Vec::new(),
+	// 		direction,
+	// 	}
+	// }
 
 	fn read(&self, index: usize) -> bool {
 		self.inputs[index].is_high().unwrap()
@@ -44,32 +56,40 @@ impl<I: InputPin<Error = ()>, O: OutputPin<Error = ()>> Matrix<I, O> {
 	}
 }
 
-impl<I: InputPin<Error = ()>, O: OutputPin<Error = ()>> KeyboardPoll for Matrix<I, O> {
-	fn poll(&mut self) -> Option<KeyEvent> {
+impl<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Matrix<I, O> {
+	async fn poll(&mut self) {
 		let num_inputs = self.inputs.len();
 		let num_outputs = self.outputs.len();
 
 		for ii in 0..num_inputs {
 			for oi in 0..num_outputs {
 				self.write(ii, true);
+				// TODO: delay
 				let state = self.read(oi);
-				let last_state = &self.last_state[ii];
 
-				// if state != last_state {
-				// 	let key_code = self.keymap[ri * self.cols.len() + ci];
-				// 	self.last_state[ri] = state;
-
-				// 	if state == 1 {
-				// 		return Some(KeyEvent::Pressed(key_code));
-				// 	} else {
-				// 		return Some(KeyEvent::Released(key_code));
-				// 	}
-				// }
+				// TODO: Make last_state a 2 dimensional array
+				match &self.last_state[ii] {
+					KeyEvent::Pressed => {
+						if state {
+							self.last_state[ii] = KeyEvent::Held;
+						} else {
+							self.last_state[ii] = KeyEvent::Released;
+						}
+					},
+					KeyEvent::Released => {
+						if state {
+							self.last_state[ii] = KeyEvent::Pressed;
+						}
+					},
+					KeyEvent::Held => {
+						if !state {
+							self.last_state[ii] = KeyEvent::Released;
+						}
+					},
+				}
 
 				self.write(oi, false);
 			}
 		}
-
-		None
 	}
 }

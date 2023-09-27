@@ -1,11 +1,17 @@
+#![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
-#![feature(generic_const_exprs)]
+// #![feature(generic_const_exprs)]
+#![feature(async_fn_in_trait)]
 
-use core::mem;
-use core::sync::atomic::{AtomicBool, Ordering};
+extern crate alloc;
+extern crate defmt_rtt;
+extern crate panic_probe;
+
+use alloc::boxed::Box;
+use alloc::vec;
 use embassy_futures::select::{select, Either};
-use embassy_nrf::gpio::{Input, Pin, Pull};
+use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
 use embassy_nrf::usb::vbus_detect::HardwareVbusDetect;
 use embassy_nrf::{bind_interrupts, peripherals, usb};
 
@@ -17,12 +23,19 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_usb::{Config, Builder};
 use embassy_usb::class::hid::{State, HidReaderWriter};
+use embedded_hal::digital::v2::InputPin;
 use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
-use {defmt_rtt as _, panic_probe as _};
+
+use embedded_alloc::Heap;
+
+#[global_allocator]
+static HEAP: Heap = Heap::empty();
 
 pub mod keyboard;
 pub mod matrix;
+pub mod reactor;
+pub mod reactor_event;
 
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;
@@ -93,7 +106,44 @@ async fn main_task() {
 
 	let mut button = Input::new(p.P0_11.degrade(), Pull::Up);
 
+	let matrix: matrix::Matrix<Input<'static, AnyPin>, Output<'static, AnyPin>> = matrix::Matrix {
+		inputs: vec![
+			Input::new(p.P0_03.degrade(), Pull::Down),
+			Input::new(p.P0_28.degrade(), Pull::Down),
+			Input::new(p.P0_29.degrade(), Pull::Down),
+		],
+
+		outputs: vec![
+			Output::new(p.P0_04.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			Output::new(p.P0_30.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			Output::new(p.P0_14.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+		],
+
+		keymap: vec![
+			keyboard::KeyCode::INT1,
+			keyboard::KeyCode::INT2,
+			keyboard::KeyCode::INT3,
+			keyboard::KeyCode::INT4,
+			keyboard::KeyCode::INT5,
+			keyboard::KeyCode::INT6,
+			keyboard::KeyCode::INT7,
+			keyboard::KeyCode::INT8,
+			keyboard::KeyCode::INT9,
+		],
+		last_state: vec![],
+		direction: matrix::MatrixDirection::Col2Row
+	};
+
+	let reactor = reactor::Reactor {
+		producers: vec![],
+		consumers: vec![],
+	};
+
+	// TODO: Setup USB HID consumer
+	// TODO: Setup matrix producer
+
 	loop {
+		reactor.react().await;
 	}
 }
 
