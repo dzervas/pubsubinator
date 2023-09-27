@@ -3,6 +3,7 @@
 #![feature(type_alias_impl_trait)]
 // #![feature(generic_const_exprs)]
 #![feature(async_fn_in_trait)]
+#![feature(trait_alias)]
 
 extern crate alloc;
 extern crate defmt_rtt;
@@ -23,7 +24,7 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_usb::{Config, Builder};
 use embassy_usb::class::hid::{State, HidReaderWriter};
-use embedded_hal::digital::v2::InputPin;
+use reactor_event::KeyCode;
 use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
 
@@ -32,10 +33,10 @@ use embedded_alloc::Heap;
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
-pub mod keyboard;
 pub mod matrix;
 pub mod reactor;
 pub mod reactor_event;
+pub mod usb_hid;
 
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;
@@ -120,22 +121,23 @@ async fn main_task() {
 		],
 
 		keymap: vec![
-			keyboard::KeyCode::INT1,
-			keyboard::KeyCode::INT2,
-			keyboard::KeyCode::INT3,
-			keyboard::KeyCode::INT4,
-			keyboard::KeyCode::INT5,
-			keyboard::KeyCode::INT6,
-			keyboard::KeyCode::INT7,
-			keyboard::KeyCode::INT8,
-			keyboard::KeyCode::INT9,
+			KeyCode::INT1,
+			KeyCode::INT2,
+			KeyCode::INT3,
+			KeyCode::INT4,
+			KeyCode::INT5,
+			KeyCode::INT6,
+			KeyCode::INT7,
+			KeyCode::INT8,
+			KeyCode::INT9,
 		],
 		last_state: vec![],
+		event_buffer: vec![],
 		direction: matrix::MatrixDirection::Col2Row
 	};
 
-	let reactor = reactor::Reactor {
-		producers: vec![],
+	let mut reactor = reactor::Reactor {
+		producers: vec![Box::new(matrix)],
 		consumers: vec![],
 	};
 

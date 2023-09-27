@@ -1420,6 +1420,7 @@ dependencies = [
  "embassy-stm32",
  "embassy-sync",
  "embassy-usb",
+ "embassy-usb-driver",
  "embedded-alloc",
  "embedded-hal 0.2.7",
  "embedded-hal-async",

@@ -1,22 +1,24 @@
 use core::convert::Infallible;
+use core::pin::Pin;
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::{vec::Vec, boxed::Box};
 use embedded_hal::digital::v2::{InputPin, OutputPin};
-use crate::keyboard::*;
+use futures::Future;
+use crate::reactor_event::*;
+use crate::reactor::{Polled, Producer};
 
 pub enum MatrixDirection {
 	Col2Row,
 	Row2Col,
 }
 
-pub type InputPinArray = Vec<Box<dyn InputPin<Error = ()>>>;
-pub type OutputPinArray = Vec<Box<dyn OutputPin<Error = ()>>>;
+pub trait InputObj = InputPin<Error = Infallible>;
+pub trait OutputObj = OutputPin<Error = Infallible>;
 // pub type InputPinArray = &'static [Box<dyn InputPin<Error = ()>>];
 // pub type OutputPinArray = &'static [Box<dyn OutputPin<Error = ()>>];
 
 // TODO: Dynamic size
-pub struct Matrix<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> {
+pub struct Matrix<I: InputObj, O: OutputObj> {
 	// TODO: Use slices instead of vectors
 	// inputs: Vec<Box<dyn InputPin<Error = ()>>>,
 	// outputs: Vec<Box<dyn OutputPin<Error = ()>>>,
@@ -27,10 +29,11 @@ pub struct Matrix<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallib
 	pub outputs: Vec<O>,
 	pub keymap: Vec<KeyCode>,
 	pub last_state: Vec<KeyEvent>,
+	pub event_buffer: Vec<KeyEvent>,
 	pub direction: MatrixDirection,
 }
 
-impl<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Matrix<I, O> {
+impl<I: InputObj, O: OutputObj> Matrix<I, O> {
 	// pub fn new(inputs: Vec<Box<dyn InputPin<Error = ()>>>, outputs: Vec<Box<dyn OutputPin<Error = ()>>>, keymap: Vec<KeyCode>, direction: MatrixDirection) -> Self {
 	// pub fn new(inputs: InputPinArray, outputs: OutputPinArray, keymap: Vec<KeyCode>, direction: MatrixDirection) -> Self {
 	// pub fn new(inputs: InputPinArray, outputs: OutputPinArray, keymap: Vec<KeyCode>, direction: MatrixDirection) -> Self {
@@ -56,8 +59,26 @@ impl<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Matrix<I
 	}
 }
 
-impl<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Matrix<I, O> {
-	async fn poll(&mut self) {
+impl<I: InputObj, O: OutputObj> Producer for Matrix<I, O> {
+	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()>>> {
+		Box::pin(async {
+			()
+		})
+	}
+
+	fn get_state(&mut self) -> Pin<Box<dyn Future<Output = Option<ReactorEvent>> + '_>> {
+		Box::pin(async {
+			if self.event_buffer.len() == 0 {
+				return None
+			}
+
+			Some(ReactorEvent::Key(self.event_buffer.remove(0)))
+		})
+	}
+}
+
+impl<I: InputObj, O: OutputObj> Polled for Matrix<I, O> {
+    async fn poll(&mut self) {
 		let num_inputs = self.inputs.len();
 		let num_outputs = self.outputs.len();
 
@@ -69,21 +90,26 @@ impl<I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Matrix<I
 
 				// TODO: Make last_state a 2 dimensional array
 				match &self.last_state[ii] {
-					KeyEvent::Pressed => {
+					KeyEvent::Pressed(code) => {
 						if state {
-							self.last_state[ii] = KeyEvent::Held;
+							self.last_state[ii] = KeyEvent::Held(code.clone());
 						} else {
-							self.last_state[ii] = KeyEvent::Released;
+							self.last_state[ii] = KeyEvent::Released(code.clone());
 						}
 					},
-					KeyEvent::Released => {
+					KeyEvent::Released(code) => {
 						if state {
-							self.last_state[ii] = KeyEvent::Pressed;
+							self.last_state[ii] = KeyEvent::Held(code.clone());
 						}
 					},
-					KeyEvent::Held => {
+					KeyEvent::Held(code) => {
 						if !state {
-							self.last_state[ii] = KeyEvent::Released;
+							self.last_state[ii] = KeyEvent::Held(code.clone());
+						}
+					},
+					KeyEvent::DoublePressed(code) => {
+						if state {
+							self.last_state[ii] = KeyEvent::Held(code.clone());
 						}
 					},
 				}
