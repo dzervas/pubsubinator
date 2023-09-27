@@ -1,0 +1,53 @@
+[package]
+name = "rustrover"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "main", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"] }
+embassy-futures  = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-sync     = { git = "https://github.com/embassy-rs/embassy", branch = "main", features = ["defmt"] }
+embassy-usb      = { git = "https://github.com/embassy-rs/embassy", branch = "main", optional = true, features = ["defmt", "msos-descriptor",] }
+
+embassy-rp    = { git = "https://github.com/embassy-rs/embassy", branch = "main", optional = true}
+embassy-nrf   = { git = "https://github.com/embassy-rs/embassy", branch = "main", optional = true, features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time"]}
+embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", branch = "main", optional = true}
+# esp-hal = { version = "0.12.0", optional = true }
+# TODO: Add esp-wifi and esp-hal
+
+defmt = "0.3"
+defmt-rtt = "0.4"
+
+panic-probe = "0.2.0"
+fixed = "1.10.0"
+static_cell = "1.1"
+
+cortex-m = { version = "0.7.6", features = ["inline-asm", "critical-section-single-core"] }
+cortex-m-rt = "0.7.0"
+rand = { version = "0.8.4", default-features = false }
+futures = { version = "0.3.17", default-features = false, features = ["async-await"] }
+
+embedded-hal = { version = "0.2.7" }
+embedded-hal-async = { version = "1.0.0-rc.1", optional = true }
+embedded-hal-bus = { version = "0.1.0-rc.1" }
+
+usbd-hid = "0.6.0"
+
+[features]
+default = ["nrf", "nrf52840", "nightly"]
+
+# Hardware targets
+rp = ["dep:embassy-rp"]
+nrf = ["dep:embassy-nrf"]
+stm32 = ["dep:embassy-stm32"]
+nrf52840 = []
+nightly = [
+	"static_cell/nightly",
+	"embassy-usb",
+	"embedded-hal-async",
+	"embassy-executor/nightly",
+	"embassy-nrf/nightly",
+]
+
+[dev-dependencies]
+test = "0.0.1"
