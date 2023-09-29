@@ -66,15 +66,15 @@ async fn main(spawner: Spawner) {
 		],
 
 		keymap: vec![
-			KeyCode::INT1,
-			KeyCode::INT2,
-			KeyCode::INT3,
-			KeyCode::INT4,
-			KeyCode::INT5,
-			KeyCode::INT6,
-			KeyCode::INT7,
-			KeyCode::INT8,
-			KeyCode::INT9,
+			KeyCode::Intl1,
+			KeyCode::Intl2,
+			KeyCode::Intl3,
+			KeyCode::Intl4,
+			KeyCode::Intl5,
+			KeyCode::Intl6,
+			KeyCode::Intl7,
+			KeyCode::Intl8,
+			KeyCode::Intl9,
 		],
 		last_state: vec![],
 		event_buffer: vec![],
@@ -138,9 +138,6 @@ async fn main(spawner: Spawner) {
 		producers: vec![Box::new(matrix)],
 		consumers: vec![Box::new(usb_hid)],
 	};
-
-	// TODO: Setup USB HID consumer
-	// TODO: Setup matrix producer
 
 	loop {
 		reactor.react().await;

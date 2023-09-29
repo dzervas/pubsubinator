@@ -51,6 +51,7 @@ impl Reactor {
 		}
 	}
 
+	// TODO: Use signals instead of calling the functions directly
 	pub async fn react(&mut self) {
 		for p in self.producers.iter_mut() {
 			for c in self.consumers.iter_mut() {

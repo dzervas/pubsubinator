@@ -17,7 +17,7 @@ pub struct UsbHid {
 }
 
 impl Consumer for UsbHid {
-	fn setup() -> Self
+    fn setup() -> Self
 	where
 		Self: Sized,
 	{
@@ -46,11 +46,21 @@ impl Consumer for UsbHid {
 					match code {
 						KeyEvent::Pressed(key) => {
 							info!("Pressed: {:?}", key);
-							self.report.keycodes[0] = key as u8;
+							if key > KeyCode::LCtrl && key < KeyCode::RGui {
+								self.report.modifier |= 1 << (key as u8 - KeyCode::LCtrl as u8);
+							} else if !self.report.keycodes.contains(&(key as u8)) {
+								if let Some(pos) = self.report.keycodes.iter().position(|&k| k == KeyCode::None as u8) {
+									self.report.keycodes[pos] = key as u8;
+								}
+							}
 						},
 						KeyEvent::Released(key) => {
 							info!("Released: {:?}", key);
-							self.report.keycodes[0] = 0;
+							if key > KeyCode::LCtrl && key < KeyCode::RGui {
+								self.report.modifier &= 0 << (key as u8 - KeyCode::LCtrl as u8);
+							} else if let Some(pos) = self.report.keycodes.iter().position(|&k| k == key as u8) {
+								self.report.keycodes[pos] = 0;
+							}
 						},
 						_ => {
 							info!("Unhandled event: {:?}", value);
@@ -66,6 +76,7 @@ impl Consumer for UsbHid {
 				// },
 				_ => {
 					info!("Unhandled event: {:?}", value);
+					return;
 				},
 			}
 
