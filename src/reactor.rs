@@ -1,12 +1,15 @@
 use core::pin::Pin;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use embassy_executor::task;
+use embassy_sync::pubsub::PubSubChannel;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_time::{Duration, Timer};
 use futures::Future;
 use defmt::*;
 
-use crate::reactor_event::*;
+use crate::{reactor_event::*, PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 
 pub trait Producer {
 	// async fn setup(&mut self);
@@ -22,7 +25,7 @@ pub trait Interrupted: Producer {
 }
 
 pub trait Polled: Producer {
-	async fn poll(&mut self);
+	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 }
 
 impl<T: Polled> Interrupted for T {
@@ -32,7 +35,7 @@ impl<T: Polled> Interrupted for T {
 }
 
 pub trait Consumer {
-	fn setup() -> Self where Self: Sized;
+	// fn setup() -> Self where Self: Sized;
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 }
 
@@ -40,6 +43,7 @@ pub struct Reactor {
 	// TODO: We need a builder?
 	pub producers: Vec<Box<dyn Producer>>,
 	pub consumers : Vec<Box<dyn Consumer>>,
+	pub channel: PubSubChannel<CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 }
 
 impl Reactor {

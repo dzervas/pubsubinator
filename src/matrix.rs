@@ -2,10 +2,13 @@ use core::convert::Infallible;
 use core::pin::Pin;
 
 use alloc::{vec::Vec, boxed::Box};
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::pubsub::Publisher;
+use embassy_time::{Timer, Duration};
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use futures::Future;
 use defmt::*;
-use crate::reactor_event::*;
+use crate::{reactor_event::*, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use crate::reactor::{Polled, Producer};
 
 pub enum MatrixDirection {
@@ -15,26 +18,21 @@ pub enum MatrixDirection {
 
 pub trait InputObj = InputPin<Error = Infallible>;
 pub trait OutputObj = OutputPin<Error = Infallible>;
-// pub type InputPinArray = &'static [Box<dyn InputPin<Error = ()>>];
-// pub type OutputPinArray = &'static [Box<dyn OutputPin<Error = ()>>];
 
 // TODO: Dynamic size
-pub struct Matrix<I: InputObj, O: OutputObj> {
+pub struct Matrix<'a, I: InputObj, O: OutputObj> {
 	// TODO: Use slices instead of vectors
-	// inputs: Vec<Box<dyn InputPin<Error = ()>>>,
-	// outputs: Vec<Box<dyn OutputPin<Error = ()>>>,
-	// inputs: InputPinArray,
-	// outputs: OutputPinArray,
 	// TODO: Make these private and create platform-specific constructors
 	pub inputs: Vec<I>,
 	pub outputs: Vec<O>,
-	pub keymap: Vec<KeyCode>,
-	pub last_state: Vec<KeyEvent>,
+	pub keymap: Vec<Vec<KeyCode>>,
+	pub last_state: Vec<Vec<KeyEvent>>,
 	pub event_buffer: Vec<KeyEvent>,
 	pub direction: MatrixDirection,
+	pub channel: Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
 }
 
-impl<I: InputObj, O: OutputObj> Matrix<I, O> {
+impl<'a, I: InputObj, O: OutputObj> Matrix<'a, I, O> {
 	fn read(&self, index: usize) -> bool {
 		self.inputs[index].is_high().unwrap()
 	}
@@ -48,11 +46,15 @@ impl<I: InputObj, O: OutputObj> Matrix<I, O> {
 	}
 }
 
-impl<I: InputObj, O: OutputObj> Producer for Matrix<I, O> {
+impl<'a, I: InputObj, O: OutputObj> Producer for Matrix<'a, I, O> {
 	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async {
-			for k in self.keymap.iter() {
-				self.last_state.push(KeyEvent::Released(*k));
+			for r in self.keymap.iter() {
+				let mut row = Vec::new();
+				for c in r.iter() {
+					row.push(KeyEvent::Released(c.clone()));
+				}
+				self.last_state.push(row);
 			}
 		})
 	}
@@ -70,50 +72,66 @@ impl<I: InputObj, O: OutputObj> Producer for Matrix<I, O> {
 	}
 }
 
-impl<I: InputObj, O: OutputObj> Polled for Matrix<I, O> {
-	async fn poll(&mut self) {
+impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
+	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
+		Box::pin(async move {
 		let num_inputs = self.inputs.len();
 		let num_outputs = self.outputs.len();
 
 		for ii in 0..num_inputs {
 			for oi in 0..num_outputs {
 				self.write(ii, true);
-				// TODO: delay
+				Timer::after(Duration::from_millis(1)).await;
 				let state = self.read(oi);
 
-				if self.last_state.len() <= ii {
-					self.last_state.push(KeyEvent::Released(self.keymap[ii]));
-				}
+				let (col, row) = match self.direction {
+					MatrixDirection::Col2Row => (oi, ii),
+					MatrixDirection::Row2Col => (ii, oi),
+				};
 
-				// TODO: Make last_state a 2 dimensional array
-				match &self.last_state[ii] {
+				// TODO: Make this a bit more beautiful
+				let new_state: KeyEvent = match &self.last_state[row][col] {
 					KeyEvent::Pressed(code) => {
 						if state {
-							self.last_state[ii] = KeyEvent::Held(code.clone());
+							// KeyEvent::Held(code.clone())
+							KeyEvent::Pressed(code.clone())
 						} else {
-							self.last_state[ii] = KeyEvent::Released(code.clone());
+							KeyEvent::Released(code.clone())
 						}
 					},
 					KeyEvent::Released(code) => {
 						if state {
 							info!("Got a pressed event: {:?}", &code);
-							self.last_state[ii] = KeyEvent::Held(code.clone());
+							KeyEvent::Pressed(code.clone())
+						} else {
+							KeyEvent::Released(code.clone())
 						}
 					},
 					KeyEvent::Held(code) => {
 						if !state {
-							self.last_state[ii] = KeyEvent::Held(code.clone());
+							KeyEvent::Released(code.clone())
+						} else {
+							KeyEvent::Held(code.clone())
 						}
 					},
 					KeyEvent::DoublePressed(code) => {
 						if state {
-							self.last_state[ii] = KeyEvent::Held(code.clone());
+							KeyEvent::Held(code.clone())
+						} else {
+							KeyEvent::Released(code.clone())
 						}
 					},
+				};
+
+				if new_state != self.last_state[row][col] {
+					// self.event_buffer.push(new_state.clone());
+					self.channel.publish(ReactorEvent::Key(new_state.clone())).await;
+					self.last_state[row][col] = new_state;
 				}
 
-				// self.write(oi, false);
+				self.write(oi, false);
 			}
 		}
+		})
 	}
 }

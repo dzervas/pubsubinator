@@ -2,36 +2,24 @@ use core::pin::Pin;
 
 use alloc::boxed::Box;
 use defmt::info;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::pubsub::Subscriber;
 use embassy_usb::control::OutResponse;
 use embassy_usb::class::hid::{HidWriter, ReportId, RequestHandler};
 use futures::Future;
 use usbd_hid::descriptor::KeyboardReport;
 
 use crate::reactor::Consumer;
-use crate::reactor_event::*;
+use crate::{reactor_event::*, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use crate::UsbDriver;
 
-pub struct UsbHid {
+pub struct UsbHid<'a>  {
 	pub writer: Option<HidWriter<'static, UsbDriver, 8>>,
 	pub report: KeyboardReport,
+	pub channel: Subscriber<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 }
 
-impl Consumer for UsbHid {
-    fn setup() -> Self
-	where
-		Self: Sized,
-	{
-		Self {
-			writer: None,
-			report: KeyboardReport {
-				modifier: 0,
-				reserved: 0,
-				leds: 0,
-				keycodes: [0; 6],
-			},
-		}
-	}
-
+impl<'a> Consumer for UsbHid<'a> {
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		if self.writer.is_none() {
 			info!("USB HID writer is not ready");

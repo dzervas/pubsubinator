@@ -1,5 +1,35 @@
 use defmt::Format;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
+pub enum KeyEvent {
+	Pressed(KeyCode),
+	Released(KeyCode),
+	Held(KeyCode),
+	DoublePressed(KeyCode),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
+pub enum ReactorEvent {
+	// Keyboard
+	Key(KeyEvent),
+	Locks { caps: bool, num: bool, scroll: bool },
+
+	// Mouse
+	// TODO: Handle the mouse wheel
+	Mouse { x: u32, y: u32 },
+
+	// Battery percentage report
+	Battery(u8),
+
+	// Simple LED control
+	LED(bool),
+	LEDAnalog(u8),
+	RGBLED { r: u8, g: u8, b: u8 },
+
+	// TODO: LED strip
+	// TODO: Screen (widgets?)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Format)]
 #[repr(u8)]
 pub enum KeyCode {
@@ -250,34 +280,4 @@ pub enum KeyCode {
 	MediaCoffee,
 	MediaRefresh,
 	MediaCalc, // 0xFB
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
-pub enum KeyEvent {
-	Pressed(KeyCode),
-	Released(KeyCode),
-	Held(KeyCode),
-	DoublePressed(KeyCode),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
-pub enum ReactorEvent {
-	// Keyboard
-	Key(KeyEvent),
-	Locks { caps: bool, num: bool, scroll: bool },
-
-	// Mouse
-	// TODO: Handle the mouse wheel
-	Mouse { x: u32, y: u32 },
-
-	// Battery percentage report
-	Battery(u8),
-
-	// Simple LED control
-	LED(bool),
-	LEDAnalog(u8),
-	RGBLED { r: u8, g: u8, b: u8 },
-
-	// TODO: LED strip
-	// TODO: Screen (widgets?)
 }

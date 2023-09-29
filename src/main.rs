@@ -4,19 +4,26 @@
 // #![feature(generic_const_exprs)]
 #![feature(async_fn_in_trait)]
 #![feature(trait_alias)]
+#![feature(generic_arg_infer)]
 
 extern crate alloc;
 extern crate defmt_rtt;
 extern crate panic_probe;
 
-use alloc::boxed::Box;
 use alloc::vec;
 use defmt::*;
 use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
 
 use embassy_executor::{Spawner, task};
 
-use reactor_event::KeyCode;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::pubsub::PubSubChannel;
+use embassy_sync::pubsub::WaitResult;
+use embassy_time::Timer;
+use embassy_time::Duration;
+use reactor::Consumer;
+use reactor::Polled;
+use reactor_event::{KeyCode, ReactorEvent};
 
 use embedded_alloc::Heap;
 
@@ -37,7 +44,8 @@ use static_cell::make_static;
 use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
 
-use crate::reactor::{react, Producer};
+use crate::matrix::Matrix;
+use crate::reactor::Producer;
 use crate::usb_hid::MyRequestHandler;
 
 bind_interrupts!(struct Irqs {
@@ -47,12 +55,24 @@ bind_interrupts!(struct Irqs {
 
 pub type UsbDriver = Driver<'static, peripherals::USBD, HardwareVbusDetect>;
 
+pub const PUBSUB_CAPACITY: usize = 16;
+pub const PUBSUB_SUBSCRIBERS: usize = 4;
+pub const PUBSUB_PUBLISHERS: usize = 4;
+pub static CHANNEL: PubSubChannel<CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS> = PubSubChannel::new();
+
 #[task]
 async fn usb_task(mut device: UsbDevice<'static, UsbDriver>) {
 	info!("USB task started");
 	device.run().await;
 	info!("USB task finished");
 }
+
+// #[task]
+// async fn poller<T: Polled + 'static>(mut poller: T) {
+// 	loop {
+// 		poller.poll().await;
+// 	}
+// }
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
@@ -67,41 +87,36 @@ async fn main(spawner: Spawner) {
 	let p = embassy_nrf::init(Default::default());
 	info!("Before heap init");
 
-	let mut matrix: matrix::Matrix<Input<'static, AnyPin>, Output<'static, AnyPin>> = matrix::Matrix {
+	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>> = make_static!(matrix::Matrix {
 		inputs: vec![
-		// 	Input::new(p.P0_03.degrade(), Pull::Down),
-		// 	Input::new(p.P0_30.degrade(), Pull::Down),
-		// 	Input::new(p.P1_14.degrade(), Pull::Down),
-			Input::new(p.P0_04.degrade(), Pull::Down),
-			Input::new(p.P0_28.degrade(), Pull::Down),
-			Input::new(p.P0_29.degrade(), Pull::Down),
+			Input::new(p.P0_03.degrade(), Pull::Down),
+			Input::new(p.P0_30.degrade(), Pull::Down),
+			Input::new(p.P1_14.degrade(), Pull::Down),
+			// Input::new(p.P0_04.degrade(), Pull::Down),
+			// Input::new(p.P0_28.degrade(), Pull::Down),
+			// Input::new(p.P0_29.degrade(), Pull::Down),
 		],
 
 		outputs: vec![
-		// 	Output::new(p.P0_04.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-		// 	Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-		// 	Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-			Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-			Output::new(p.P0_30.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-			Output::new(p.P1_14.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			Output::new(p.P0_04.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			// Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			// Output::new(p.P0_30.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			// Output::new(p.P1_14.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
 		],
 
 		keymap: vec![
-			KeyCode::Intl1,
-			KeyCode::Intl2,
-			KeyCode::Intl3,
-			KeyCode::Intl4,
-			KeyCode::Intl5,
-			KeyCode::Intl6,
-			KeyCode::Intl7,
-			KeyCode::Intl8,
-			KeyCode::Intl9,
+			vec![KeyCode::Intl1, KeyCode::Intl2, KeyCode::Intl3],
+			vec![KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
+			vec![KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
 		],
 		last_state: vec![],
 		event_buffer: vec![],
-		direction: matrix::MatrixDirection::Col2Row
-	};
-	matrix.setup();
+		direction: matrix::MatrixDirection::Col2Row,
+		channel: CHANNEL.publisher().unwrap(),
+	});
+	matrix.setup().await;
 	info!("Matrix initialized");
 
 	// -- Setup USB HID consumer --
@@ -146,7 +161,7 @@ async fn main(spawner: Spawner) {
 
 	spawner.spawn(usb_task(usb)).unwrap();
 
-	let usb_hid = usb_hid::UsbHid {
+	let usb_hid = make_static!(usb_hid::UsbHid {
 		writer: Some(writer),
 		report: KeyboardReport {
 			modifier: 0,
@@ -154,23 +169,32 @@ async fn main(spawner: Spawner) {
 			leds: 0,
 			keycodes: [0; 6],
 		},
-	};
+		channel: CHANNEL.subscriber().unwrap(),
+	});
 
 	info!("USB HID consumer initialized");
 
-	// let remote_wakeup: Signal<CriticalSectionRawMutex, bool> = Signal::new();
+	spawner.spawn(poller(matrix)).unwrap();
+	spawner.spawn(subscriber(usb_hid)).unwrap();
+}
 
-	let reactor = make_static!(reactor::Reactor {
-		producers: vec![Box::new(matrix)],
-		consumers: vec![Box::new(usb_hid)],
-	});
+#[task]
+async fn poller(poller: &'static mut dyn Polled) {
+	loop {
+		poller.poll().await;
 
-	info!("Reactor initialized");
+		Timer::after(Duration::from_millis(10)).await;
+	}
+}
 
-	// loop {
-		// info!("Reacting");
-		// reactor.react().await;
-	// }
+#[task]
+async fn subscriber(subscriber: &'static mut dyn Consumer) {
+	loop {
+		let msg = CHANNEL.dyn_subscriber().unwrap().next_message().await;
 
-	spawner.spawn(react(reactor)).unwrap();
+		match msg {
+			WaitResult::Message(event) => subscriber.push(event).await,
+			WaitResult::Lagged(_) => {},
+		}
+	}
 }
