@@ -30,7 +30,7 @@ impl<T: Polled> Interrupted for T {
 
 pub trait Consumer {
 	fn setup() -> Self where Self: Sized;
-	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()>>>;
+	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 }
 
 pub struct Reactor {
@@ -45,7 +45,7 @@ impl Reactor {
 			p.setup().await;
 		}
 
-		for c in self.consumers.iter_mut() {
+		for _c in self.consumers.iter_mut() {
 			// TODO: Pass the objects in this function and return an object
 			// c.setup().await;
 		}

@@ -11,22 +11,11 @@ extern crate panic_probe;
 
 use alloc::boxed::Box;
 use alloc::vec;
-use embassy_futures::select::{select, Either};
 use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
-use embassy_nrf::usb::vbus_detect::HardwareVbusDetect;
-use embassy_nrf::{bind_interrupts, peripherals, usb};
 
 use embassy_executor::{Spawner, task};
 
-use defmt::*;
-use embassy_nrf::usb::Driver;
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::signal::Signal;
-use embassy_usb::{Config, Builder};
-use embassy_usb::class::hid::{State, HidReaderWriter};
 use reactor_event::KeyCode;
-use usbd_hid::descriptor::KeyboardReport;
-use usbd_hid::descriptor::SerializedDescriptor;
 
 use embedded_alloc::Heap;
 
@@ -38,74 +27,30 @@ pub mod reactor;
 pub mod reactor_event;
 pub mod usb_hid;
 
+use embassy_nrf::usb::Driver;
+use embassy_nrf::usb::vbus_detect::HardwareVbusDetect;
+use embassy_nrf::{bind_interrupts, peripherals, usb};
+use embassy_usb::class::hid::{HidWriter, State};
+use embassy_usb::{Builder, Config, UsbDevice};
+use static_cell::make_static;
+use usbd_hid::descriptor::KeyboardReport;
+use usbd_hid::descriptor::SerializedDescriptor;
+
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;
 	POWER_CLOCK => usb::vbus_detect::InterruptHandler;
 });
 
+pub type UsbDriver = Driver<'static, peripherals::USBD, HardwareVbusDetect>;
+
 #[task]
-async fn main_task() {
+async fn usb_task(mut device: UsbDevice<'static, UsbDriver>) {
+	device.run().await;
+}
+
+#[embassy_executor::main]
+async fn main(spawner: Spawner) {
 	let p = embassy_nrf::init(Default::default());
-
-	let driver = Driver::new(p.USBD, Irqs, HardwareVbusDetect::new(Irqs));
-
-	let mut config = Config::new(0xc0de, 0xcafe);
-	config.manufacturer = Some("Embassy");
-	config.product = Some("HID keyboard example");
-	config.serial_number = Some("12345678");
-	config.max_power = 100;
-	config.max_packet_size_0 = 64;
-	config.supports_remote_wakeup = true;
-
-	let mut device_descriptor = [0; 256];
-	let mut config_descriptor = [0; 256];
-	let mut bos_descriptor = [0; 256];
-	let mut msos_descriptor = [0; 256];
-	let mut control_buf = [0; 64];
-	// let request_handler = MyRequestHandler {};
-	// let mut device_handler = MyDeviceHandler::new();
-
-	let mut state = State::new();
-
-	let mut builder = Builder::new(
-		driver,
-		config,
-		&mut device_descriptor,
-		&mut config_descriptor,
-		&mut bos_descriptor,
-		&mut msos_descriptor,
-		&mut control_buf,
-	);
-
-	// builder.handler(&mut device_handler);
-
-	// Create classes on the builder.
-	let config = embassy_usb::class::hid::Config {
-		report_descriptor: KeyboardReport::desc(),
-		// request_handler: Some(&request_handler),
-		request_handler: None,
-		poll_ms: 60,
-		max_packet_size: 64,
-	};
-	let hid = HidReaderWriter::<_, 1, 8>::new(&mut builder, &mut state, config);
-
-	// Build the builder.
-	let mut usb = builder.build();
-
-	let remote_wakeup: Signal<CriticalSectionRawMutex, bool> = Signal::new();
-
-	// Run the USB device.
-	let usb_fut = async {
-		loop {
-			usb.run_until_suspend().await;
-			match select(usb.wait_resume(), remote_wakeup.wait()).await {
-				Either::First(_) => (),
-				Either::Second(_) => unwrap!(usb.remote_wakeup().await),
-			}
-		}
-	};
-
-	let mut button = Input::new(p.P0_11.degrade(), Pull::Up);
 
 	let matrix: matrix::Matrix<Input<'static, AnyPin>, Output<'static, AnyPin>> = matrix::Matrix {
 		inputs: vec![
@@ -136,9 +81,62 @@ async fn main_task() {
 		direction: matrix::MatrixDirection::Col2Row
 	};
 
+	// -- Setup USB HID consumer --
+
+	let driver = Driver::new(p.USBD, Irqs, HardwareVbusDetect::new(Irqs));
+
+	let mut usb_config = Config::new(0xc0de, 0xcafe);
+	usb_config.manufacturer = Some("DZervas");
+	usb_config.product = Some("RustRover");
+	usb_config.serial_number = Some(env!("CARGO_PKG_VERSION"));
+	usb_config.max_power = 100;
+	usb_config.max_packet_size_0 = 64;
+	usb_config.supports_remote_wakeup = true;
+
+	let mut builder = Builder::new(
+		driver,
+		usb_config,
+        &mut make_static!([0; 256])[..],
+        &mut make_static!([0; 256])[..],
+        &mut make_static!([0; 256])[..],
+        &mut make_static!([0; 128])[..],
+        &mut make_static!([0; 128])[..],
+	);
+
+	// spawner.spawn(usb_fut).unwrap();
+
+	// Create classes on the builder.
+	let hid_config = embassy_usb::class::hid::Config {
+		report_descriptor: KeyboardReport::desc(),
+		// request_handler: Some(&request_handler),
+		request_handler: None,
+		poll_ms: 60,
+		max_packet_size: 64,
+	};
+
+	// let mut state = State::new();
+	let state = make_static!(State::new());
+	let writer = HidWriter::<_, 8>::new(&mut builder, state, hid_config);
+
+	let usb = builder.build();
+
+	spawner.spawn(usb_task(usb)).unwrap();
+
+	let usb_hid = usb_hid::UsbHid {
+		writer: Some(writer),
+		report: KeyboardReport {
+			modifier: 0,
+			reserved: 0,
+			leds: 0,
+			keycodes: [0; 6],
+		},
+	};
+
+	// let remote_wakeup: Signal<CriticalSectionRawMutex, bool> = Signal::new();
+
 	let mut reactor = reactor::Reactor {
 		producers: vec![Box::new(matrix)],
-		consumers: vec![],
+		consumers: vec![Box::new(usb_hid)],
 	};
 
 	// TODO: Setup USB HID consumer
@@ -147,9 +145,6 @@ async fn main_task() {
 	loop {
 		reactor.react().await;
 	}
-}
 
-#[embassy_executor::main]
-async fn main(spawner: Spawner) {
-	spawner.spawn(main_task()).unwrap();
+	// spawner.spawn(main_task()).unwrap();
 }

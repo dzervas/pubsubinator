@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use defmt::Format;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
 pub enum KeyCode {
 	N0,
 	N1,
@@ -22,7 +24,7 @@ pub enum KeyCode {
 	INT9,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
 pub enum KeyEvent {
 	Pressed(KeyCode),
 	Released(KeyCode),
@@ -30,6 +32,7 @@ pub enum KeyEvent {
 	DoublePressed(KeyCode),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
 pub enum ReactorEvent {
 	// Keyboard
 	Key(KeyEvent),
