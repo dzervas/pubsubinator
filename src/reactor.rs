@@ -1,7 +1,10 @@
 use core::pin::Pin;
 
-use alloc::{vec::Vec, boxed::Box};
+use alloc::{boxed::Box, vec::Vec};
+use embassy_executor::task;
+use embassy_time::{Duration, Timer};
 use futures::Future;
+use defmt::*;
 
 use crate::reactor_event::*;
 
@@ -10,7 +13,7 @@ pub trait Producer {
 	// TODO: Support partial state
 	// async fn get_state(&self) -> ReactorEvent;
 
-	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()>>>;
+	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 	fn get_state(&mut self) -> Pin<Box<dyn Future<Output = Option<ReactorEvent>> + '_>>;
 }
 
@@ -50,16 +53,25 @@ impl Reactor {
 			// c.setup().await;
 		}
 	}
+}
 
-	// TODO: Use signals instead of calling the functions directly
-	pub async fn react(&mut self) {
-		for p in self.producers.iter_mut() {
-			for c in self.consumers.iter_mut() {
+
+// TODO: Use signals instead of calling the functions directly
+#[task]
+pub async fn react(reactor: &'static mut Reactor) {
+	loop {
+		for p in reactor.producers.iter_mut() {
+			for c in reactor.consumers.iter_mut() {
 				match p.get_state().await {
-					Some(event) => c.push(event).await,
+					Some(event) => {
+						info!("Got event! {:?}", event);
+						c.push(event).await
+					},
 					None => {},
 				}
 			}
 		}
+
+		Timer::after(Duration::from_millis(100)).await;
 	}
 }
