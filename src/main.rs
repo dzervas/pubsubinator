@@ -10,6 +10,8 @@ extern crate alloc;
 extern crate defmt_rtt;
 extern crate panic_probe;
 
+use core::mem::size_of;
+
 use alloc::vec;
 use defmt::*;
 use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
@@ -55,7 +57,7 @@ bind_interrupts!(struct Irqs {
 
 pub type UsbDriver = Driver<'static, peripherals::USBD, HardwareVbusDetect>;
 
-pub const PUBSUB_CAPACITY: usize = 2048;
+pub const PUBSUB_CAPACITY: usize = 20 * size_of::<ReactorEvent>();
 pub const PUBSUB_SUBSCRIBERS: usize = 4;
 pub const PUBSUB_PUBLISHERS: usize = 4;
 pub static CHANNEL: PubSubChannel<CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS> = PubSubChannel::new();

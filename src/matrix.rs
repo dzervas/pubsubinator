@@ -4,7 +4,6 @@ use core::pin::Pin;
 use alloc::{vec::Vec, boxed::Box};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
-use embassy_time::{Timer, Duration};
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use futures::Future;
 use defmt::*;
@@ -66,59 +65,65 @@ impl<'a, I: InputObj, O: OutputObj> Producer for Matrix<'a, I, O> {
 impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async move {
-		let num_inputs = self.inputs.len();
-		let num_outputs = self.outputs.len();
+			let mut event_buffer = Vec::new();
+			let num_inputs = self.inputs.len();
+			let num_outputs = self.outputs.len();
 
-		for oi in 0..num_outputs {
-			self.write(oi, true);
-			Timer::after(Duration::from_micros(10)).await;
+			for oi in 0..num_outputs {
+				self.write(oi, true);
+				// Timer::after(Duration::from_micros(10)).await;
 
-			for ii in 0..num_inputs {
-				let state = self.read(ii);
+				for ii in 0..num_inputs {
+					let state = self.read(ii);
 
-				let (col, row) = match self.direction {
-					MatrixDirection::Col2Row => (oi, ii),
-					MatrixDirection::Row2Col => (ii, oi),
-				};
-
-				self.last_state[row][col].1 += 1;
-
-				// TODO: Make this a bit more beautiful
-				let new_state: KeyEvent = match &self.last_state[row][col].0 {
-					KeyEvent::Released(code) => {
-						if state && self.last_state[row][col].1 >= DEBOUNCE_CYCLES {
-							info!("Got a pressed event: {:?}", &code);
-							KeyEvent::Pressed(code.clone())
-						} else {
-							KeyEvent::Released(code.clone())
-						}
-					},
-					KeyEvent::Pressed(code) => {
-						if state {
-							KeyEvent::Pressed(code.clone())
-						} else {
-							info!("Got a released event: {:?}", &code);
-							KeyEvent::Released(code.clone())
-						}
-					},
-				};
-
-				if self.last_state[row][col].1 == 255 {
-					match new_state {
-						KeyEvent::Released(_) => self.last_state[row][col].1 = 0,
-						KeyEvent::Pressed(_) => self.last_state[row][col].1 = DEBOUNCE_CYCLES + 1,
+					let (col, row) = match self.direction {
+						MatrixDirection::Col2Row => (oi, ii),
+						MatrixDirection::Row2Col => (ii, oi),
 					};
+
+					self.last_state[row][col].1 += 1;
+
+					// TODO: Make this a bit more beautiful
+					let new_state: KeyEvent = match &self.last_state[row][col].0 {
+						KeyEvent::Released(code) => {
+							if state && self.last_state[row][col].1 >= DEBOUNCE_CYCLES {
+								info!("Got a pressed event: {:?}", &code);
+								KeyEvent::Pressed(code.clone())
+							} else {
+								KeyEvent::Released(code.clone())
+							}
+						},
+						KeyEvent::Pressed(code) => {
+							if state {
+								KeyEvent::Pressed(code.clone())
+							} else {
+								info!("Got a released event: {:?}", &code);
+								KeyEvent::Released(code.clone())
+							}
+						},
+					};
+
+					if self.last_state[row][col].1 == 255 {
+						match new_state {
+							KeyEvent::Released(_) => self.last_state[row][col].1 = 0,
+							KeyEvent::Pressed(_) => self.last_state[row][col].1 = DEBOUNCE_CYCLES + 1,
+						};
+					}
+
+					if new_state != self.last_state[row][col].0 {
+						// self.channel.publish_immediate(ReactorEvent::Key(new_state.clone()));
+						event_buffer.push(ReactorEvent::Key(new_state.clone()));
+						self.last_state[row][col].0 = new_state;
+					}
 				}
 
-				if new_state != self.last_state[row][col].0 {
-					self.channel.publish_immediate(ReactorEvent::Key(new_state.clone()));
-					self.last_state[row][col].0 = new_state;
-				}
-
+				self.write(oi, false);
 			}
 
-			self.write(oi, false);
-		}
+			// event_buffer.reverse();
+			for e in event_buffer.iter() {
+				self.channel.publish_immediate(e.clone());
+			}
 		})
 	}
 }
