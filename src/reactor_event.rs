@@ -4,8 +4,9 @@ use defmt::Format;
 pub enum KeyEvent {
 	Pressed(KeyCode),
 	Released(KeyCode),
-	Held(KeyCode),
-	DoublePressed(KeyCode),
+	// TODO: Configurable alternate button behavior
+	// Held(KeyCode),
+	// DoublePressed(KeyCode),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]

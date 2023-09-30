@@ -11,6 +11,10 @@ use defmt::*;
 use crate::{reactor_event::*, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use crate::reactor::{Polled, Producer};
 
+pub const MATRIX_PERIOD: u64 = 10;
+pub const DEBOUNCE_CYCLES: u8 = 1;
+// pub const HOLD_CYCLES: u8 = 200;
+
 pub enum MatrixDirection {
 	Col2Row,
 	Row2Col,
@@ -26,8 +30,7 @@ pub struct Matrix<'a, I: InputObj, O: OutputObj> {
 	pub inputs: Vec<I>,
 	pub outputs: Vec<O>,
 	pub keymap: Vec<Vec<KeyCode>>,
-	pub last_state: Vec<Vec<KeyEvent>>,
-	pub event_buffer: Vec<KeyEvent>,
+	pub last_state: Vec<Vec<(KeyEvent, u8)>>,
 	pub direction: MatrixDirection,
 	pub channel: Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
 }
@@ -52,22 +55,10 @@ impl<'a, I: InputObj, O: OutputObj> Producer for Matrix<'a, I, O> {
 			for r in self.keymap.iter() {
 				let mut row = Vec::new();
 				for c in r.iter() {
-					row.push(KeyEvent::Released(c.clone()));
+					row.push((KeyEvent::Released(c.clone()), 0));
 				}
 				self.last_state.push(row);
 			}
-		})
-	}
-
-	fn get_state(&mut self) -> Pin<Box<dyn Future<Output = Option<ReactorEvent>> + '_>> {
-		Box::pin(async {
-			self.poll().await;
-
-			if self.event_buffer.len() == 0 {
-				return None
-			}
-
-			Some(ReactorEvent::Key(self.event_buffer.remove(0)))
 		})
 	}
 }
@@ -78,59 +69,55 @@ impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
 		let num_inputs = self.inputs.len();
 		let num_outputs = self.outputs.len();
 
-		for ii in 0..num_inputs {
-			for oi in 0..num_outputs {
-				self.write(ii, true);
-				Timer::after(Duration::from_millis(1)).await;
-				let state = self.read(oi);
+		for oi in 0..num_outputs {
+			self.write(oi, true);
+			Timer::after(Duration::from_micros(10)).await;
+
+			for ii in 0..num_inputs {
+				let state = self.read(ii);
 
 				let (col, row) = match self.direction {
 					MatrixDirection::Col2Row => (oi, ii),
 					MatrixDirection::Row2Col => (ii, oi),
 				};
 
+				self.last_state[row][col].1 += 1;
+
 				// TODO: Make this a bit more beautiful
-				let new_state: KeyEvent = match &self.last_state[row][col] {
-					KeyEvent::Pressed(code) => {
-						if state {
-							// KeyEvent::Held(code.clone())
-							KeyEvent::Pressed(code.clone())
-						} else {
-							KeyEvent::Released(code.clone())
-						}
-					},
+				let new_state: KeyEvent = match &self.last_state[row][col].0 {
 					KeyEvent::Released(code) => {
-						if state {
+						if state && self.last_state[row][col].1 >= DEBOUNCE_CYCLES {
 							info!("Got a pressed event: {:?}", &code);
 							KeyEvent::Pressed(code.clone())
 						} else {
 							KeyEvent::Released(code.clone())
 						}
 					},
-					KeyEvent::Held(code) => {
-						if !state {
-							KeyEvent::Released(code.clone())
-						} else {
-							KeyEvent::Held(code.clone())
-						}
-					},
-					KeyEvent::DoublePressed(code) => {
+					KeyEvent::Pressed(code) => {
 						if state {
-							KeyEvent::Held(code.clone())
+							KeyEvent::Pressed(code.clone())
 						} else {
+							info!("Got a released event: {:?}", &code);
 							KeyEvent::Released(code.clone())
 						}
 					},
 				};
 
-				if new_state != self.last_state[row][col] {
-					// self.event_buffer.push(new_state.clone());
-					self.channel.publish(ReactorEvent::Key(new_state.clone())).await;
-					self.last_state[row][col] = new_state;
+				if self.last_state[row][col].1 == 255 {
+					match new_state {
+						KeyEvent::Released(_) => self.last_state[row][col].1 = 0,
+						KeyEvent::Pressed(_) => self.last_state[row][col].1 = DEBOUNCE_CYCLES + 1,
+					};
 				}
 
-				self.write(oi, false);
+				if new_state != self.last_state[row][col].0 {
+					self.channel.publish_immediate(ReactorEvent::Key(new_state.clone()));
+					self.last_state[row][col].0 = new_state;
+				}
+
 			}
+
+			self.write(oi, false);
 		}
 		})
 	}

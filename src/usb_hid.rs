@@ -50,9 +50,9 @@ impl<'a> Consumer for UsbHid<'a> {
 								self.report.keycodes[pos] = 0;
 							}
 						},
-						_ => {
-							info!("Unhandled event: {:?}", value);
-						},
+						// _ => {
+						// 	info!("Unhandled event: {:?}", value);
+						// },
 					}
 				},
 				// ReactorEvent::Locks { caps, num, scroll } => {
