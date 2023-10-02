@@ -25,7 +25,7 @@ fixed = "1.10.0"
 static_cell = "1.1"
 
 cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
-cortex-m-rt = "0.7.0"
+cortex-m-rt = "0.7.3"
 rand = { version = "0.8.4", default-features = false }
 futures = { version = "0.3.17", default-features = false, features = ["async-await"] }
 
