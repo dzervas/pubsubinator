@@ -13,7 +13,7 @@
 			"connectUnderReset": false,
 			"runtimeExecutable": "/home/dzervas/.cargo/bin/probe-rs",
 			"chip": "nRF52840_xxAA",
-			"consoleLogLevel": "Debug",
+			"consoleLogLevel": "Console",
 			"flashingConfig": {
 				"flashingEnabled": true,
 				"haltAfterReset": false,
