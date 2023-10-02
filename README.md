@@ -12,5 +12,5 @@ which could be fitting for a keyboard and mouse firmware.
 ## Compile and view logs
 
 ```bash
-DEFMT_LOG=debug cargo flash --chip nRF52840_xxAA && probe-rs attach --chip nRF52840_xxAA target/thumbv7em-none-eabi/debug/rustrover
+DEFMT_LOG=debug cargo flash --chip nRF52840_xxAA && probe-rs attach --chip nRF52840_xxAA target/thumbv7em-none-eabi/debug/clackrust
 ```

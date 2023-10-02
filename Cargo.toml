@@ -1,6 +1,6 @@
 [package]
-name = "rustrover"
-version = "0.1.0"
+name = "clackrust"
+version = "0.1.2"
 edition = "2021"
 
 [dependencies]
