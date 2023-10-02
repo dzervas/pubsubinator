@@ -4,7 +4,6 @@ version = "0.1.2"
 edition = "2021"
 
 [dependencies]
-embassy-boot       = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-boot-v0.1.1", features = ["defmt"] }
 embassy-executor   = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-executor-v0.3.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"] }
 embassy-futures    = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-futures-v0.1.0" }
 embassy-sync       = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-sync-v0.3.0", features = ["defmt"] }
