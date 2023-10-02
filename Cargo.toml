@@ -33,7 +33,7 @@ embedded-hal = { version = "0.2.7" }
 embedded-hal-async = { version = "1.0.0-rc.1", optional = true }
 embedded-hal-bus = { version = "0.1.0-rc.1" }
 
-usbd-hid = "0.6.0"
+usbd-hid = "0.6.1"
 embedded-alloc = "0.5.0"
 usb-device = { version = "0.2.9", features = ["defmt"] }
 heapless = { version = "0.7.16", features = ["defmt", "defmt-impl"] }
