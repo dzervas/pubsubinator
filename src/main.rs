@@ -22,7 +22,6 @@ use embassy_executor::{task, Spawner};
 use embassy_nrf::interrupt::Interrupt;
 use embassy_nrf::interrupt::InterruptExt;
 use embassy_nrf::interrupt::Priority;
-// use embassy_nrf::usb::vbus_detect;
 use embassy_nrf::usb::vbus_detect::SoftwareVbusDetect;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::PubSubChannel;
@@ -30,9 +29,9 @@ use embassy_time::Duration;
 use embassy_time::Ticker;
 use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
-use nrf_softdevice::SocEvent;
-use nrf_softdevice::ble::peripheral;
+use nrf_softdevice::ble::{gatt_server, peripheral};
 use nrf_softdevice::raw;
+use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
 use reactor::Consumer;
 use reactor::Polled;
@@ -49,7 +48,6 @@ pub mod reactor_event;
 pub mod usb_hid;
 
 use embassy_nrf::usb::Driver;
-use embassy_nrf::usb::vbus_detect::HardwareVbusDetect;
 use embassy_nrf::{bind_interrupts, peripherals, usb};
 use embassy_usb::class::hid::{HidWriter, State};
 use embassy_usb::{Builder, Config, UsbDevice};
@@ -63,7 +61,6 @@ use crate::usb_hid::MyRequestHandler;
 
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;
-	// POWER_CLOCK => usb::vbus_detect::InterruptHandler;
 });
 
 pub type UsbDriver = Driver<'static, peripherals::USBD, &'static SoftwareVbusDetect>;
@@ -72,9 +69,27 @@ pub const PUBSUB_CAPACITY: usize = 20 * size_of::<ReactorEvent>();
 pub const PUBSUB_SUBSCRIBERS: usize = 4;
 pub const PUBSUB_PUBLISHERS: usize = 4;
 pub static CHANNEL: PubSubChannel<CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS> = PubSubChannel::new();
-// pub static mut VBUS_DETECT: SoftwareVbusDetect = SoftwareVbusDetect::new(false, false);
 lazy_static! {
+	// TODO: Add supprt for HardwareVbusDetect as well to avoid needing the SoftDevice
 	pub static ref VBUS_DETECT: SoftwareVbusDetect = SoftwareVbusDetect::new(false, false);
+}
+
+#[nrf_softdevice::gatt_service(uuid = "180f")]
+struct BatteryService {
+	#[characteristic(uuid = "2a19", read, notify)]
+	battery_level: u8,
+}
+
+#[nrf_softdevice::gatt_service(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
+struct FooService {
+	#[characteristic(uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38", read, write, notify, indicate)]
+	foo: u16,
+}
+
+#[nrf_softdevice::gatt_server]
+struct Server {
+	bas: BatteryService,
+	foo: FooService,
 }
 
 #[task]
@@ -208,13 +223,14 @@ async fn main(spawner: Spawner) {
 
 	let sd_config = nrf_softdevice::Config {
 		clock: Some(raw::nrf_clock_lf_cfg_t {
+			// Use external crystal
 			source: raw::NRF_CLOCK_LF_SRC_XTAL as u8,
+			// Need to be 0 for external crystal
 			rc_ctiv: 0,
+			// Need to be 0 for external crystal
 			rc_temp_ctiv: 0,
-			// accuracy: raw::NRF_CLOCK_LF_ACCURACY_20_PPM as u8,
-			// rc_ctiv: 16,
-			// rc_temp_ctiv: 2,
-			accuracy: raw::NRF_CLOCK_LF_ACCURACY_500_PPM as u8,
+			// Crystal accuracy - why 20?
+			accuracy: raw::NRF_CLOCK_LF_ACCURACY_20_PPM as u8,
 		}),
 		conn_gap: Some(raw::ble_gap_conn_cfg_t {
 			conn_count: 6,
@@ -240,44 +256,78 @@ async fn main(spawner: Spawner) {
 	};
 
 	let sd = Softdevice::enable(&sd_config);
+	let server = unwrap!(Server::new(sd));
 
 	// spawner.spawn(softdevice_task(sd, &mut VBUS_DETECT)).unwrap();
 	spawner.spawn(softdevice_task(sd)).unwrap();
 
 	info!("Starting advertisement");
 
+	// let adv_data = &[
+	// 	0x02, raw::BLE_GAP_AD_TYPE_FLAGS as u8, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
+	// 	0x03, raw::BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE as u8, 0x09, 0x18, 0x0a,
+	// 	raw::BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME as u8, b'H', b'e', b'l', b'l', b'o', b'R', b'u', b's', b't',
+	// ];
+
+	// let scan_data = &[
+	// 	0x03, raw::BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE as u8, 0x09, 0x18,
+	// ];
+
+	// let mut config = peripheral::Config::default();
+	// config.interval = 50;
+	// let adv = peripheral::NonconnectableAdvertisement::ScannableUndirected {
+	// 	adv_data,
+	// 	scan_data,
+	// };
+	// unwrap!(peripheral::advertise(sd, adv, &config).await);
+
+	#[rustfmt::skip]
 	let adv_data = &[
-		0x02,
-		raw::BLE_GAP_AD_TYPE_FLAGS as u8,
-		raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
-		0x03,
-		raw::BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE as u8,
-		0x09,
-		0x18,
-		0x0a,
-		raw::BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME as u8,
-		b'H',
-		b'e',
-		b'l',
-		b'l',
-		b'o',
-		b'R',
-		b'u',
-		b's',
-		b't',
+		0x02, 0x01, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
+		0x03, 0x03, 0x09, 0x18,
+		0x0a, 0x09, b'H', b'e', b'l', b'l', b'o', b'R', b'u', b's', b't',
 	];
 	#[rustfmt::skip]
 	let scan_data = &[
-		0x03, raw::BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE as u8, 0x09, 0x18,
+		0x03, 0x03, 0x09, 0x18,
 	];
 
-	let mut config = peripheral::Config::default();
-	config.interval = 50;
-	let adv = peripheral::NonconnectableAdvertisement::ScannableUndirected {
-		adv_data,
-		scan_data,
-	};
-	unwrap!(peripheral::advertise(sd, adv, &config).await);
+	loop {
+		let config = peripheral::Config::default();
+		let adv = peripheral::ConnectableAdvertisement::ScannableUndirected { adv_data, scan_data };
+		let conn = unwrap!(peripheral::advertise_connectable(sd, adv, &config).await);
+
+		info!("advertising done!");
+
+		// Run the GATT server on the connection. This returns when the connection gets disconnected.
+		//
+		// Event enums (ServerEvent's) are generated by nrf_softdevice::gatt_server
+		// proc macro when applied to the Server struct above
+		let e = gatt_server::run(&conn, &server, |e| match e {
+			ServerEvent::Bas(e) => match e {
+				BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
+					info!("battery notifications: {}", notifications)
+				}
+			},
+			ServerEvent::Foo(e) => match e {
+				FooServiceEvent::FooWrite(val) => {
+					info!("wrote foo: {}", val);
+					if let Err(e) = server.foo.foo_notify(&conn, &(val + 1)) {
+						info!("send notification error: {:?}", e);
+					}
+				}
+				FooServiceEvent::FooCccdWrite {
+					indications,
+					notifications,
+				} => {
+					info!("foo indications: {}, notifications: {}", indications, notifications)
+				}
+			},
+		})
+		.await;
+
+		info!("gatt_server run exited with error: {:?}", e);
+	}
 
 }
 

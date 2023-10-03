@@ -1,13 +1,45 @@
 {
 	"cSpell.words": [
-		"keymap"
+		"bitfield",
+		"ctiv",
+		"defmt",
+		"GATTS",
+		"gpio",
+		"gpiote",
+		"Irqs",
+		"keycodes",
+		"keymap",
+		"leds",
+		"Nonconnectable",
+		"periph",
+		"rustfmt",
+		"softdevice",
+		"Uninit",
+		"USBD",
+		"vbus",
+		"VLOC",
+		"wakeup",
+		"XTAL"
 	],
 	"rust-analyzer.cargo.target": "thumbv7em-none-eabi",
-	"rust-analyzer.check.allTargets": true,
+	"rust-analyzer.check.allTargets": false,
 	"rust-analyzer.check.targets": [
 		"thumbv6m-none-eabi",
 		"thumbv7m-none-eabi",
 		"thumbv7em-none-eabi",
 		"thumbv7em-none-eabihf",
+	],
+	"rust-analyzer.cargo.buildScripts.overrideCommand": [
+		"cargo",
+		"check",
+		"--quiet",
+		"--workspace",
+		"--message-format=json"
+	],
+	"rust-analyzer.check.overrideCommand": [
+		"cargo",
+		"check",
+		"--workspace",
+		"--message-format=json"
 	],
 }
