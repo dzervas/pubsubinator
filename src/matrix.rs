@@ -10,8 +10,8 @@ use defmt::*;
 use crate::{reactor_event::*, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use crate::reactor::{Polled, Producer};
 
-pub const MATRIX_PERIOD: u64 = 10;
-pub const DEBOUNCE_CYCLES: u8 = 1;
+pub const MATRIX_PERIOD: u64 = 2;
+pub const DEBOUNCE_CYCLES: u8 = 3;
 // pub const HOLD_CYCLES: u8 = 200;
 
 pub enum MatrixDirection {
