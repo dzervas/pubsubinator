@@ -52,6 +52,3 @@ nightly = [
 	"embassy-executor/nightly",
 	"embassy-nrf/nightly",
 ]
-
-[dev-dependencies]
-probe-rs = { version = "0.20.0", features = ["cli"] }
