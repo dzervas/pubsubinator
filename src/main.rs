@@ -284,12 +284,12 @@ async fn main(spawner: Spawner) {
 	#[rustfmt::skip]
 	let adv_data = &[
 		0x02, 0x01, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
-		0x03, 0x03, 0x09, 0x18,
+		0x03, 0x03, 0x12, 0x18, // 3 bytes wide, HID service
 		0x0a, 0x09, b'H', b'e', b'l', b'l', b'o', b'R', b'u', b's', b't',
 	];
 	#[rustfmt::skip]
 	let scan_data = &[
-		0x03, 0x03, 0x09, 0x18,
+		0x03, 0x03, 0x0f, 0x18, // 3 bytes wide, Battery service
 	];
 
 	loop {
