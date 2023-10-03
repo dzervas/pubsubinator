@@ -38,7 +38,8 @@ embedded-alloc = "0.5.0"
 usb-device = { version = "0.2.9", features = ["defmt"] }
 
 # TODO: Needs critical-section-impl?
-nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "critical-section-impl" ] }
+nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 # nrf-softdevice-s140 = { git = "https://github.com/embassy-rs/nrf-softdevice" }
 
 [features]
@@ -46,9 +47,6 @@ default = [
 	"nrf",
 	"nrf52840",
 	"nightly",
-
-	"ble-sec",
-	"ble-gatt-server",
 ]
 
 # Hardware targets
@@ -64,8 +62,3 @@ nightly = [
 	"embassy-nrf/nightly",
 	"nrf-softdevice/nightly"
 ]
-
-ble-l2cap = ["nrf-softdevice/ble-l2cap"]
-ble-gatt-server = ["nrf-softdevice/ble-gatt-server"]
-ble-gatt-client = ["nrf-softdevice/ble-gatt-client"]
-ble-sec = ["nrf-softdevice/ble-sec"]

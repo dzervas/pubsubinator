@@ -175,6 +175,7 @@ dependencies = [
  "embedded-hal-bus",
  "fixed",
  "futures",
+ "lazy_static",
  "nrf-softdevice",
  "panic-probe",
  "rand",
@@ -939,7 +940,7 @@ dependencies = [
  "atomic-polyfill 0.1.11",
  "hash32",
  "rustc_version 0.4.0",
- "spin",
+ "spin 0.9.8",
  "stable_deref_trait",
 ]
 
@@ -1021,6 +1022,9 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+dependencies = [
+ "spin 0.5.2",
+]
 
 [[package]]
 name = "libc"
@@ -1657,6 +1661,12 @@ name = "smallvec"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "942b4a808e05215192e39f4ab80813e599068285906cc91aa64f923db842bd5a"
+
+[[package]]
+name = "spin"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "spin"

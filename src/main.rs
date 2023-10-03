@@ -9,6 +9,7 @@
 extern crate alloc;
 extern crate defmt_rtt;
 extern crate panic_probe;
+extern crate embassy_nrf;
 
 use core::mem;
 use core::mem::size_of;
@@ -17,13 +18,19 @@ use alloc::vec;
 use defmt::*;
 use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
 
-use embassy_executor::{Spawner, task};
-
+use embassy_executor::{task, Spawner};
+use embassy_nrf::interrupt::Interrupt;
+use embassy_nrf::interrupt::InterruptExt;
+use embassy_nrf::interrupt::Priority;
+// use embassy_nrf::usb::vbus_detect;
+use embassy_nrf::usb::vbus_detect::SoftwareVbusDetect;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::PubSubChannel;
 use embassy_time::Duration;
 use embassy_time::Ticker;
+use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
+use nrf_softdevice::SocEvent;
 use nrf_softdevice::ble::peripheral;
 use nrf_softdevice::raw;
 use nrf_softdevice::Softdevice;
@@ -56,15 +63,19 @@ use crate::usb_hid::MyRequestHandler;
 
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;
-	POWER_CLOCK => usb::vbus_detect::InterruptHandler;
+	// POWER_CLOCK => usb::vbus_detect::InterruptHandler;
 });
 
-pub type UsbDriver = Driver<'static, peripherals::USBD, HardwareVbusDetect>;
+pub type UsbDriver = Driver<'static, peripherals::USBD, &'static SoftwareVbusDetect>;
 
 pub const PUBSUB_CAPACITY: usize = 20 * size_of::<ReactorEvent>();
 pub const PUBSUB_SUBSCRIBERS: usize = 4;
 pub const PUBSUB_PUBLISHERS: usize = 4;
 pub static CHANNEL: PubSubChannel<CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS> = PubSubChannel::new();
+// pub static mut VBUS_DETECT: SoftwareVbusDetect = SoftwareVbusDetect::new(false, false);
+lazy_static! {
+	pub static ref VBUS_DETECT: SoftwareVbusDetect = SoftwareVbusDetect::new(false, false);
+}
 
 #[task]
 async fn usb_task(mut device: UsbDevice<'static, UsbDriver>) {
@@ -74,9 +85,19 @@ async fn usb_task(mut device: UsbDevice<'static, UsbDriver>) {
 }
 
 #[task]
+// async fn softdevice_task(sd: &'static Softdevice, vbus_detect: &'static mut SoftwareVbusDetect) {
 async fn softdevice_task(sd: &'static Softdevice) {
 	info!("SoftDevice task started");
-	sd.run().await;
+	sd.run_with_callback(|event: SocEvent| {
+		info!("SoftDevice event: {:?}", event);
+
+		match event {
+			SocEvent::PowerUsbRemoved => VBUS_DETECT.detected(false),
+			SocEvent::PowerUsbDetected => VBUS_DETECT.detected(true),
+			SocEvent::PowerUsbPowerReady => VBUS_DETECT.ready(),
+			_ => {}
+		};
+	}).await;
 	info!("SoftDevice task finished");
 }
 
@@ -90,7 +111,13 @@ async fn main(spawner: Spawner) {
 		unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) }
 	}
 
-	let p = embassy_nrf::init(Default::default());
+	Interrupt::USBD.set_priority(Priority::P2);
+	// Interrupt::POWER_CLOCK.set_priority(Priority::P2);
+
+	let mut config = embassy_nrf::config::Config::default();
+	config.gpiote_interrupt_priority = Priority::P2;
+	config.time_interrupt_priority = Priority::P2;
+	let p = embassy_nrf::init(config);
 	info!("Before heap init");
 
 	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>> = make_static!(matrix::Matrix {
@@ -119,8 +146,10 @@ async fn main(spawner: Spawner) {
 	info!("Matrix initialized");
 
 	// -- Setup USB HID consumer --
-
-	let driver = Driver::new(p.USBD, Irqs, HardwareVbusDetect::new(Irqs));
+	// let vbus_detect: &'static mut SoftwareVbusDetect = make_static!(SoftwareVbusDetect::new(false, false));
+	// let mut vbus_detect: SoftwareVbusDetect = SoftwareVbusDetect::new(false, false);
+	// let driver = Driver::new(p.USBD, Irqs, vbus_detect);
+	let driver = Driver::new(p.USBD, Irqs, &*VBUS_DETECT);
 
 	let mut usb_config = Config::new(0xc0de, 0xcafe);
 	usb_config.manufacturer = Some("DZervas");
@@ -182,10 +211,10 @@ async fn main(spawner: Spawner) {
 			source: raw::NRF_CLOCK_LF_SRC_XTAL as u8,
 			rc_ctiv: 0,
 			rc_temp_ctiv: 0,
-			accuracy: raw::NRF_CLOCK_LF_ACCURACY_20_PPM as u8,
+			// accuracy: raw::NRF_CLOCK_LF_ACCURACY_20_PPM as u8,
 			// rc_ctiv: 16,
 			// rc_temp_ctiv: 2,
-			// accuracy: raw::NRF_CLOCK_LF_ACCURACY_500_PPM as u8,
+			accuracy: raw::NRF_CLOCK_LF_ACCURACY_500_PPM as u8,
 		}),
 		conn_gap: Some(raw::ble_gap_conn_cfg_t {
 			conn_count: 6,
@@ -212,6 +241,7 @@ async fn main(spawner: Spawner) {
 
 	let sd = Softdevice::enable(&sd_config);
 
+	// spawner.spawn(softdevice_task(sd, &mut VBUS_DETECT)).unwrap();
 	spawner.spawn(softdevice_task(sd)).unwrap();
 
 	info!("Starting advertisement");
