@@ -6,11 +6,12 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Subscriber;
 use embassy_usb::control::OutResponse;
 use embassy_usb::class::hid::{HidWriter, ReportId, RequestHandler};
-use futures::Future;
 use usbd_hid::descriptor::KeyboardReport;
+use futures::Future;
 
+use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use crate::reactor::Consumer;
-use crate::{reactor_event::*, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
+use crate::reactor_event::*;
 use crate::UsbDriver;
 
 pub struct UsbHid<'a>  {

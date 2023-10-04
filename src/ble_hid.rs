@@ -6,6 +6,7 @@ use embassy_sync::pubsub::Subscriber;
 use futures::Future;
 use nrf_softdevice::ble::{gatt_server, peripheral};
 use nrf_softdevice::{raw, Softdevice};
+use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
 
@@ -19,12 +20,12 @@ pub struct BatteryService {
 	battery_level: u8,
 }
 
-pub struct KeyboardReport {
-	pub modifier: u8,
-	pub reserved: u8,
-	pub leds: u8,
-	pub keycodes: [u8; 6],
-}
+// pub struct KeyboardReport {
+// 	pub modifier: u8,
+// 	pub reserved: u8,
+// 	pub leds: u8,
+// 	pub keycodes: [u8; 6],
+// }
 
 #[nrf_softdevice::gatt_service(uuid = "1812")]
 pub struct KeyboardService {

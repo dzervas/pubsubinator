@@ -46,6 +46,7 @@ pub mod reactor;
 pub mod reactor_event;
 pub mod usb_hid;
 pub mod ble_hid;
+// pub mod report;
 
 use embassy_nrf::usb::Driver;
 use embassy_nrf::{bind_interrupts, peripherals, usb};
@@ -101,7 +102,7 @@ async fn softdevice_task(sd: &'static Softdevice) {
 }
 
 #[task]
-async fn ble_hid_task(mut ble_hid: &'static mut BleHid<'static>) {
+async fn ble_hid_task(ble_hid: &'static mut BleHid<'static>) {
 	info!("BLE HID task started");
 	ble_hid.run().await;
 	info!("BLE HID task finished");
@@ -249,7 +250,7 @@ async fn main(spawner: Spawner) {
 	let ble_hid = make_static!(BleHid {
 		softdevice: sd,
 		server,
-		report: ble_hid::KeyboardReport {
+		report: KeyboardReport {
 			modifier: 0,
 			reserved: 0,
 			leds: 0,
@@ -272,8 +273,6 @@ async fn poller(poller: &'static mut dyn Polled) {
 
 	loop {
 		poller.poll().await;
-
-		// Timer::after(Duration::from_millis(MATRIX_PERIOD)).await;
 		ticker.next().await;
 	}
 }
