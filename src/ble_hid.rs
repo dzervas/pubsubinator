@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Subscriber;
 use futures::Future;
+use nrf_softdevice::ble::gatt_server::characteristic::Attribute;
 use nrf_softdevice::ble::{gatt_server, peripheral};
 use nrf_softdevice::{raw, Softdevice};
 use usbd_hid::descriptor::KeyboardReport;
@@ -29,26 +30,44 @@ pub struct BatteryService {
 
 #[nrf_softdevice::gatt_service(uuid = "1812")]
 pub struct KeyboardService {
-	// #[characteristic(uuid = "2a4a", read)]
-	// hid_information: [u8; 4], // Typically, the HID Information is 4 bytes, but it can vary.
+	#[characteristic(uuid = "2a4a", read)]
+	hid_information: [u8; 4], // Typically, the HID Information is 4 bytes, but it can vary.
 
 	// #[characteristic(uuid = "2a4b", read, write)]
 	// hid_control_point: u8, // HID Control Point, used for control commands like "suspend" or "exit suspend".
 
 	// Boot Keyboard Input Report
-	// #[characteristic(uuid = "2a22", read, notify)]
-	// boot_keyboard_input_report: [u8; 8], // This size can vary based on your needs.
+	#[characteristic(uuid = "2a22", read, notify)]
+	boot_keyboard_input_report: [u8; 8], // This size can vary based on your needs.
 
 	// Boot Keyboard Output Report (LED states like Caps Lock)
 	// #[characteristic(uuid = "2a32", write, notify)]
 	// boot_keyboard_output_report: u8,
 
 	// HID Report Map (describes the format of the HID reports)
-	#[characteristic(uuid = "2a4b", read)]
+	#[characteristic(uuid = "2a4b", read, write, notify, indicate, write_without_response)]
 	report: [u8; 8], // This will be an array that describes the report format.
 
 	// Other characteristics like HID Report can be added as needed.
 }
+
+// pub struct HidReportAttribute<T: AsRef<[u8]>>(Attribute<T>);
+
+// impl<T: AsRef<[u8]>> HidReportAttribute<T> {
+// 	pub fn new(value: T) -> Self {
+// 		Self(Attribute::new(value))
+// 	}
+
+// 	pub fn deferred_read(&self) -> Attribute<T> {
+// 		info!("deferred_read");
+// 		self.0.deferred_read()
+// 	}
+
+// 	pub fn read_security(self, security: nrf_softdevice::ble::gatt_server::characteristic::Security) -> Self {
+// 		info!("read_security");
+// 		Self(self.0.read_security(security))
+// 	}
+// }
 
 #[nrf_softdevice::gatt_server]
 pub struct Server {
@@ -78,6 +97,8 @@ impl<'a> BleHid<'a> {
 			0x03, 0x03, 0x0f, 0x18, // 3 bytes wide, Battery service
 		];
 
+		self.server.keyboard.report_set(&[0x12, 0x34, 0xac, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
+
 		loop {
 			let config = peripheral::Config::default();
 			let adv = peripheral::ConnectableAdvertisement::ScannableUndirected { adv_data, scan_data };
@@ -96,19 +117,15 @@ impl<'a> BleHid<'a> {
 					}
 				},
 				ServerEvent::Keyboard(e) => match e {
-					// KeyboardServiceEvent::ReportRead(val) => {
-					// 	info!("wrote foo: {}", val);
-					// 	// if let Err(e) = server..foo_notify(&conn, &(val + 1)) {
-					// 	// 	info!("send notification error: {:?}", e);
-					// 	// }
-					// }
-					// KeyboardServiceEvent::KeyboardCccdWrite {
-					// 	indications,
-					// 	notifications,
-					// } => {
-					// 	info!("foo indications: {}, notifications: {}", indications, notifications)
-					// }
+					KeyboardServiceEvent::ReportCccdWrite { notifications, indications } => {
+						info!("keyboard notifications: {} {}", notifications, indications)
+					},
+					KeyboardServiceEvent::ReportWrite(report) => {
+						info!("keyboard report: {:?}", report)
+					},
+					_ => info!("Unhandled keyboard event")
 				},
+				_ => info!("Unhandled event")
 			})
 			.await;
 

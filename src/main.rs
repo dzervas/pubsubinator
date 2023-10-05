@@ -29,6 +29,10 @@ use embassy_time::Duration;
 use embassy_time::Ticker;
 use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
+use nrf_softdevice::ble::Uuid;
+use nrf_softdevice::ble::gatt_server::builder::ServiceBuilder;
+use nrf_softdevice::ble::gatt_server::characteristic::Metadata;
+use nrf_softdevice::ble::gatt_server::characteristic::Properties;
 use nrf_softdevice::raw;
 use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
@@ -247,6 +251,13 @@ async fn main(spawner: Spawner) {
 	let sd = Softdevice::enable(&sd_config);
 	let server = unwrap!(ble_hid::Server::new(sd));
 
+	// let services = ServiceBuilder::new(sd, Uuid::new_16(0x1812)).unwrap()
+	// 	.add_characteristic(Uuid::new_16(0x2A4B), ble_hid::HidReportAttribute::new(), Metadata::new(Properties {
+	// 		read: true,
+	// 		..Default::default()
+	// 	})).unwrap()
+	// 	.build();
+
 	let ble_hid = make_static!(BleHid {
 		softdevice: sd,
 		server,
@@ -263,7 +274,7 @@ async fn main(spawner: Spawner) {
 
 	info!("Starting advertisement");
 	spawner.spawn(ble_hid_task(ble_hid)).unwrap();
-	spawner.spawn(subscriber(ble_hid)).unwrap();
+	// spawner.spawn(subscriber(ble_hid)).unwrap();
 }
 
 #[task]
