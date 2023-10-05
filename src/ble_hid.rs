@@ -4,7 +4,6 @@ use alloc::boxed::Box;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Subscriber;
 use futures::Future;
-use nrf_softdevice::ble::gatt_server::characteristic::Attribute;
 use nrf_softdevice::ble::{gatt_server, peripheral};
 use nrf_softdevice::{raw, Softdevice};
 use usbd_hid::descriptor::KeyboardReport;
@@ -125,7 +124,6 @@ impl<'a> BleHid<'a> {
 					},
 					_ => info!("Unhandled keyboard event")
 				},
-				_ => info!("Unhandled event")
 			})
 			.await;
 

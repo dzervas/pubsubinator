@@ -19,8 +19,6 @@ use defmt::*;
 use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
 
 use embassy_executor::{task, Spawner};
-use embassy_nrf::interrupt::Interrupt;
-use embassy_nrf::interrupt::InterruptExt;
 use embassy_nrf::interrupt::Priority;
 use embassy_nrf::usb::vbus_detect::SoftwareVbusDetect;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
@@ -29,10 +27,6 @@ use embassy_time::Duration;
 use embassy_time::Ticker;
 use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
-use nrf_softdevice::ble::Uuid;
-use nrf_softdevice::ble::gatt_server::builder::ServiceBuilder;
-use nrf_softdevice::ble::gatt_server::characteristic::Metadata;
-use nrf_softdevice::ble::gatt_server::characteristic::Properties;
 use nrf_softdevice::raw;
 use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
@@ -50,26 +44,23 @@ pub mod reactor;
 pub mod reactor_event;
 pub mod usb_hid;
 pub mod ble_hid;
+pub mod nrf;
 // pub mod report;
 
-use embassy_nrf::usb::Driver;
 use embassy_nrf::{bind_interrupts, peripherals, usb};
-use embassy_usb::class::hid::{HidWriter, State};
-use embassy_usb::{Builder, Config, UsbDevice};
 use static_cell::make_static;
-use usbd_hid::descriptor::KeyboardReport;
-use usbd_hid::descriptor::SerializedDescriptor;
+// use usbd_hid::descriptor::KeyboardReport;
 
 use crate::matrix::Matrix;
+use crate::nrf::usb_init;
+use crate::nrf::usb_task;
 use crate::reactor::Producer;
-use crate::usb_hid::MyRequestHandler;
 use crate::ble_hid::BleHid;
+use crate::usb_hid::UsbHid;
 
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;
 });
-
-pub type UsbDriver = Driver<'static, peripherals::USBD, &'static SoftwareVbusDetect>;
 
 pub const PUBSUB_CAPACITY: usize = 20 * size_of::<ReactorEvent>();
 pub const PUBSUB_SUBSCRIBERS: usize = 4;
@@ -77,19 +68,10 @@ pub const PUBSUB_PUBLISHERS: usize = 4;
 pub static CHANNEL: PubSubChannel<CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS> = PubSubChannel::new();
 lazy_static! {
 	// TODO: Add support for HardwareVbusDetect as well to avoid needing the SoftDevice
-	pub static ref VBUS_DETECT: SoftwareVbusDetect = SoftwareVbusDetect::new(false, false);
-}
-
-
-#[task]
-async fn usb_task(mut device: UsbDevice<'static, UsbDriver>) {
-	info!("USB task started");
-	device.run().await;
-	info!("USB task finished");
+	pub static ref VBUS_DETECT: SoftwareVbusDetect = SoftwareVbusDetect::new(true, true);
 }
 
 #[task]
-// async fn softdevice_task(sd: &'static Softdevice, vbus_detect: &'static mut SoftwareVbusDetect) {
 async fn softdevice_task(sd: &'static Softdevice) {
 	info!("SoftDevice task started");
 	sd.run_with_callback(|event: SocEvent| {
@@ -122,14 +104,13 @@ async fn main(spawner: Spawner) {
 		unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) }
 	}
 
-	Interrupt::USBD.set_priority(Priority::P2);
-	// Interrupt::POWER_CLOCK.set_priority(Priority::P2);
-
 	let mut config = embassy_nrf::config::Config::default();
 	config.gpiote_interrupt_priority = Priority::P2;
 	config.time_interrupt_priority = Priority::P2;
 	let p = embassy_nrf::init(config);
 	info!("Before heap init");
+
+	// -- Setup Matrix publisher --
 
 	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>> = make_static!(matrix::Matrix {
 		inputs: vec![
@@ -154,64 +135,18 @@ async fn main(spawner: Spawner) {
 		channel: CHANNEL.publisher().unwrap(),
 	});
 	matrix.setup().await;
-	info!("Matrix initialized");
+	spawner.spawn(poller(matrix)).unwrap();
+	info!("Matrix publisher initialized");
 
 	// -- Setup USB HID consumer --
-	let driver = Driver::new(p.USBD, Irqs, &*VBUS_DETECT);
+	let mut usb_builder = usb_init(p.USBD);
+	let usb_hid = make_static!(UsbHid::new(&mut usb_builder));
 
-	let mut usb_config = Config::new(0xc0de, 0xcafe);
-	usb_config.manufacturer = Some("DZervas");
-	usb_config.product = Some("RustRover");
-	usb_config.serial_number = Some(env!("CARGO_PKG_VERSION"));
-	usb_config.max_power = 100;
-	usb_config.max_packet_size_0 = 64;
-	usb_config.supports_remote_wakeup = true;
-
-	let mut builder = Builder::new(
-		driver,
-		usb_config,
-		&mut make_static!([0; 256])[..],
-		&mut make_static!([0; 256])[..],
-		&mut make_static!([0; 256])[..],
-		&mut make_static!([0; 128])[..],
-		&mut make_static!([0; 128])[..],
-	);
-
-	info!("USB HID consumer initialized");
-
-	let request_handler = make_static!(MyRequestHandler {});
-
-	// Create classes on the builder.
-	let hid_config = embassy_usb::class::hid::Config {
-		report_descriptor: KeyboardReport::desc(),
-		request_handler: Some(request_handler),
-		poll_ms: 60,
-		max_packet_size: 64,
-	};
-
-	let state = make_static!(State::new());
-	let writer = HidWriter::<_, 8>::new(&mut builder, state, hid_config);
-
-	let usb = builder.build();
-
-	spawner.spawn(usb_task(usb)).unwrap();
-
-	let usb_hid = make_static!(usb_hid::UsbHid {
-		writer: Some(writer),
-		report: KeyboardReport {
-			modifier: 0,
-			reserved: 0,
-			leds: 0,
-			keycodes: [0; 6],
-		},
-		channel: CHANNEL.subscriber().unwrap(),
-	});
-
-	info!("USB HID consumer initialized");
-
-	spawner.spawn(poller(matrix)).unwrap();
+	spawner.spawn(usb_task(usb_builder)).unwrap();
 	spawner.spawn(subscriber(usb_hid)).unwrap();
+	info!("USB HID consumer initialized");
 
+	// -- Setup SoftDevice --
 	info!("Starting SoftDevice BLE shit");
 
 	let sd_config = nrf_softdevice::Config {
@@ -249,8 +184,11 @@ async fn main(spawner: Spawner) {
 	};
 
 	let sd = Softdevice::enable(&sd_config);
-	let server = unwrap!(ble_hid::Server::new(sd));
+	// let server = unwrap!(ble_hid::Server::new(sd));
+	spawner.spawn(softdevice_task(sd)).unwrap();
+	info!("SoftDevice initialized");
 
+	// -- Setup BLE HID consumer --
 	// let services = ServiceBuilder::new(sd, Uuid::new_16(0x1812)).unwrap()
 	// 	.add_characteristic(Uuid::new_16(0x2A4B), ble_hid::HidReportAttribute::new(), Metadata::new(Properties {
 	// 		read: true,
@@ -258,22 +196,20 @@ async fn main(spawner: Spawner) {
 	// 	})).unwrap()
 	// 	.build();
 
-	let ble_hid = make_static!(BleHid {
-		softdevice: sd,
-		server,
-		report: KeyboardReport {
-			modifier: 0,
-			reserved: 0,
-			leds: 0,
-			keycodes: [0; 6],
-		},
-		channel: CHANNEL.subscriber().unwrap(),
-	});
+	// let ble_hid = make_static!(BleHid {
+	// 	softdevice: sd,
+	// 	server,
+	// 	report: KeyboardReport {
+	// 		modifier: 0,
+	// 		reserved: 0,
+	// 		leds: 0,
+	// 		keycodes: [0; 6],
+	// 	},
+	// 	channel: CHANNEL.subscriber().unwrap(),
+	// });
 
-	spawner.spawn(softdevice_task(sd)).unwrap();
-
-	info!("Starting advertisement");
-	spawner.spawn(ble_hid_task(ble_hid)).unwrap();
+	// info!("Starting advertisement");
+	// spawner.spawn(ble_hid_task(ble_hid)).unwrap();
 	// spawner.spawn(subscriber(ble_hid)).unwrap();
 }
 

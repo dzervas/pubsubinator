@@ -2,25 +2,53 @@ use core::pin::Pin;
 
 use alloc::boxed::Box;
 use defmt::info;
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::pubsub::Subscriber;
+use embassy_usb::Builder;
 use embassy_usb::control::OutResponse;
-use embassy_usb::class::hid::{HidWriter, ReportId, RequestHandler};
-use usbd_hid::descriptor::KeyboardReport;
+use embassy_usb::class::hid::{HidWriter, ReportId, RequestHandler, State};
 use futures::Future;
+use static_cell::make_static;
+use usbd_hid::descriptor::KeyboardReport;
+use usbd_hid::descriptor::SerializedDescriptor;
 
-use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use crate::reactor::Consumer;
 use crate::reactor_event::*;
-use crate::UsbDriver;
+use crate::nrf::UsbDriver;
 
-pub struct UsbHid<'a>  {
-	pub writer: Option<HidWriter<'static, UsbDriver, 8>>,
-	pub report: KeyboardReport,
-	pub channel: Subscriber<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
+pub struct UsbHid {
+	writer: Option<HidWriter<'static, UsbDriver, 8>>,
+	report: KeyboardReport,
 }
 
-impl<'a> Consumer for UsbHid<'a> {
+impl UsbHid {
+	pub fn new(builder: &mut Builder<'static, UsbDriver>) -> Self {
+		info!("Initializing USB HID");
+
+		let request_handler = make_static!(MyRequestHandler {});
+
+		// Create classes on the builder.
+		let hid_config = embassy_usb::class::hid::Config {
+			report_descriptor: KeyboardReport::desc(),
+			request_handler: Some(request_handler),
+			poll_ms: 60,
+			max_packet_size: 64,
+		};
+
+		let state = make_static!(State::new());
+		let writer = HidWriter::<_, 8>::new(builder, state, hid_config);
+
+		Self {
+			writer: Some(writer),
+			report: KeyboardReport {
+				modifier: 0,
+				reserved: 0,
+				leds: 0,
+				keycodes: [0; 6],
+			},
+		}
+	}
+}
+
+impl Consumer for UsbHid {
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		if self.writer.is_none() {
 			info!("USB HID writer is not ready");
@@ -70,12 +98,10 @@ impl<'a> Consumer for UsbHid<'a> {
 			}
 
 			self.writer.as_mut().unwrap().ready().await;
-
 			self.writer.as_mut().unwrap().write_serialize(&self.report).await.unwrap();
 		})
 	}
 }
-
 
 pub struct MyRequestHandler {}
 
