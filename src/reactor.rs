@@ -31,7 +31,7 @@ pub trait RSubscriber {
 	// TODO: Keep the type and add an event `Any` to the enum or let the subscriber define the whole logic?
 	// type SupportedEvents: IntoIterator<Item = ReactorEvent>;
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>>;
-	fn is_supported(&self, event: ReactorEvent) -> bool {
+	fn is_supported(&self, _event: ReactorEvent) -> bool {
 		// Self::SupportedEvents::into_iter().any(|e| e == event)
 		true
 	}

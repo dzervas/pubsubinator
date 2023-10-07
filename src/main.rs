@@ -1,10 +1,10 @@
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
-// #![feature(generic_const_exprs)]
 #![feature(async_fn_in_trait)]
-#![feature(trait_alias)]
 #![feature(generic_arg_infer)]
+// #![feature(generic_const_exprs)]
+#![feature(trait_alias)]
+#![feature(type_alias_impl_trait)]
 
 extern crate alloc;
 extern crate defmt_rtt;
@@ -145,7 +145,6 @@ async fn main(spawner: Spawner) {
 	let usb_hid = make_static!(UsbHid::new(&mut usb_builder));
 
 	spawner.spawn(usb_task(usb_builder)).unwrap();
-	spawner.spawn(subscribers_task(usb_hid)).unwrap();
 	info!("USB HID consumer initialized");
 
 	// -- Setup SoftDevice --
@@ -213,6 +212,9 @@ async fn main(spawner: Spawner) {
 	// info!("Starting advertisement");
 	// spawner.spawn(ble_hid_task(ble_hid)).unwrap();
 	// spawner.spawn(subscriber(ble_hid)).unwrap();
+
+
+	spawner.spawn(subscriber_task(usb_hid)).unwrap();
 }
 
 #[task]
@@ -228,7 +230,7 @@ async fn poller_task(poller: &'static mut dyn Polled) {
 }
 
 #[task]
-async fn subscribers_task(subscriber: &'static mut dyn RSubscriber) {
+async fn subscriber_task(subscriber: &'static mut dyn RSubscriber) {
 	info!("Subscriber task started");
 	let mut listener = CHANNEL.subscriber().unwrap();
 	loop {
@@ -236,9 +238,11 @@ async fn subscribers_task(subscriber: &'static mut dyn RSubscriber) {
 
 		info!("[subscriber] Got a message: {:?}", msg);
 
-		// TODO: Turn this into a join of all subscribers
-		if subscriber.is_supported(msg) {
-			subscriber.push(msg).await;
+		// let valid_subs: Vec<_> = subscribers.iter().filter(|s| s.is_supported(msg.clone())).collect();
+
+		// join!(valid_subs.map(|s| s.push(msg.clone())));
+		if subscriber.is_supported(msg.clone()) {
+			subscriber.push(msg.clone()).await;
 		}
 	}
 }
