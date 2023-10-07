@@ -1,7 +1,11 @@
+use core::pin::Pin;
+
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use defmt::*;
+use futures::Future;
 
-use crate::middleware::PublisherMiddleware;
+use crate::middleware::Middleware;
 use crate::reactor_event::{ReactorEvent, KeyCode, KeyEvent};
 
 pub const KEYMAP_PERIOD: u64 = 2;
@@ -34,38 +38,42 @@ impl Keymap {
 	}
 }
 
-impl PublisherMiddleware<Vec<Vec<bool>>> for Keymap {
-	async fn process(&mut self, value_map: Vec<Vec<bool>>) -> Option<ReactorEvent> {
-		for (rindex, rarray) in value_map.iter().enumerate() {
-			for (cindex, cvalue) in rarray.iter().enumerate() {
-				let mut new_state: KeyEvent = self.last_state[rindex][cindex].0;
+// TODO: Specify the is_supported
+impl Middleware for Keymap {
+	fn process(&mut self, event: ReactorEvent) -> Pin<Box<dyn Future<Output = Option<ReactorEvent>> + '_>> {
+		Box::pin(async move {
+			let (value, rindex, cindex) = match event {
+				ReactorEvent::HardwareMappedBool(value, rindex, cindex) => (value, rindex, cindex),
+				_ => return None,
+			};
 
-				match self.last_state[rindex][cindex].0 {
-					KeyEvent::Released(code) => {
-						if *cvalue && self.last_state[rindex][cindex].1 >= self.debounce_cycles {
-							info!("Got a pressed event: {:?}", &code);
-							new_state = KeyEvent::Pressed(code);
-						}
-					},
-					KeyEvent::Pressed(code) => {
-						if !*cvalue {
-							info!("Got a released event: {:?}", &code);
-							new_state = KeyEvent::Released(code)
-						}
-					},
-				};
+			let mut new_state: KeyEvent = self.last_state[rindex][cindex].0;
 
-				if new_state != self.last_state[rindex][cindex].0 {
-					self.last_state[rindex][cindex].0 = new_state;
-					self.last_state[rindex][cindex].1 = 0;
-					return Some(ReactorEvent::Key(new_state));
-				}
+			match self.last_state[rindex][cindex].0 {
+				KeyEvent::Released(code) => {
+					if value && self.last_state[rindex][cindex].1 >= self.debounce_cycles {
+						info!("Got a pressed event: {:?}", &code);
+						new_state = KeyEvent::Pressed(code);
+					}
+				},
+				KeyEvent::Pressed(code) => {
+					if value {
+						info!("Got a released event: {:?}", &code);
+						new_state = KeyEvent::Released(code)
+					}
+				},
+			};
 
-				// Integer overload should be handled as a normal event
-				self.last_state[rindex][cindex].1 += 1;
+			if new_state != self.last_state[rindex][cindex].0 {
+				self.last_state[rindex][cindex].0 = new_state;
+				self.last_state[rindex][cindex].1 = 0;
+				return Some(ReactorEvent::Key(new_state));
 			}
-		}
 
-		None
+			// Integer overload should be handled as a normal event
+			self.last_state[rindex][cindex].1 += 1;
+
+			None
+		})
 	}
 }

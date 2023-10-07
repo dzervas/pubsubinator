@@ -30,7 +30,7 @@ use matrix::MATRIX_PERIOD;
 use nrf_softdevice::raw;
 use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
-use reactor::Subscriber;
+use reactor::RSubscriber;
 use reactor::Polled;
 use reactor_event::{KeyCode, ReactorEvent};
 
@@ -56,7 +56,7 @@ use static_cell::make_static;
 use crate::matrix::Matrix;
 use crate::nrf::usb_init;
 use crate::nrf::usb_task;
-use crate::reactor::Publisher;
+use crate::reactor::RPublisher;
 use crate::ble_hid::BleHid;
 use crate::usb_hid::UsbHid;
 
@@ -137,7 +137,7 @@ async fn main(spawner: Spawner) {
 		channel: CHANNEL.publisher().unwrap(),
 	});
 	matrix.setup().await;
-	spawner.spawn(poller(matrix)).unwrap();
+	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");
 
 	// -- Setup USB HID consumer --
@@ -145,7 +145,7 @@ async fn main(spawner: Spawner) {
 	let usb_hid = make_static!(UsbHid::new(&mut usb_builder));
 
 	spawner.spawn(usb_task(usb_builder)).unwrap();
-	spawner.spawn(subscriber(usb_hid)).unwrap();
+	spawner.spawn(subscribers_task(usb_hid)).unwrap();
 	info!("USB HID consumer initialized");
 
 	// -- Setup SoftDevice --
@@ -216,18 +216,19 @@ async fn main(spawner: Spawner) {
 }
 
 #[task]
-async fn poller(poller: &'static mut dyn Polled) {
+async fn poller_task(poller: &'static mut dyn Polled) {
 	let mut ticker = Ticker::every(Duration::from_millis(MATRIX_PERIOD));
 	info!("Poller task started");
 
 	loop {
+		// TODO: Turn this into a join of all pollers
 		poller.poll().await;
 		ticker.next().await;
 	}
 }
 
 #[task]
-async fn subscriber(subscriber: &'static mut dyn Subscriber) {
+async fn subscribers_task(subscriber: &'static mut dyn RSubscriber) {
 	info!("Subscriber task started");
 	let mut listener = CHANNEL.subscriber().unwrap();
 	loop {
@@ -235,6 +236,9 @@ async fn subscriber(subscriber: &'static mut dyn Subscriber) {
 
 		info!("[subscriber] Got a message: {:?}", msg);
 
-		subscriber.push(msg).await;
+		// TODO: Turn this into a join of all subscribers
+		if subscriber.is_supported(msg) {
+			subscriber.push(msg).await;
+		}
 	}
 }

@@ -29,6 +29,12 @@ pub enum ReactorEvent {
 
 	// TODO: LED strip
 	// TODO: Screen (widgets?)
+
+	// Hardware
+	// TODO: Why 2 dimensions? Why not 1? Why not variable?
+	HardwareMappedBool(bool, usize, usize),
+	HardwareMappedU8(u8, usize, usize),
+	HardwareMappedU16(u16, usize, usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Format)]

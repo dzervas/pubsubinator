@@ -10,7 +10,7 @@ use static_cell::make_static;
 use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
 
-use crate::reactor::Subscriber;
+use crate::reactor::RSubscriber;
 use crate::reactor_event::*;
 use crate::nrf::UsbDriver;
 
@@ -48,7 +48,16 @@ impl UsbHid {
 	}
 }
 
-impl Subscriber for UsbHid {
+impl RSubscriber for UsbHid {
+	fn is_supported(&self, event: ReactorEvent) -> bool {
+		(match event {
+			ReactorEvent::Key(_) => true,
+			// ReactorEvent::Locks { caps, num, scroll } => true,
+			// ReactorEvent::Mouse { x, y } => true,
+			_ => false,
+		}) && self.writer.is_some()
+	}
+
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		if self.writer.is_none() {
 			info!("USB HID writer is not ready");
