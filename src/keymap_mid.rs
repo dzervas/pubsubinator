@@ -15,14 +15,13 @@ pub const KEYMAP_PERIOD: u64 = 2;
 
 pub struct Keymap {
 	keymap: Vec<Vec<KeyCode>>,
-	pub debounce_cycles: u8,
 	pub hold_cycles: u16,
 	last_state: Vec<Vec<(KeyEvent, u8)>>,
 	channel: Publisher<'static, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
 }
 
 impl Keymap {
-	pub fn new(keymap: Vec<Vec<KeyCode>>, debounce_cycles: u8, hold_cycles: u16) -> Self {
+	pub fn new(keymap: Vec<Vec<KeyCode>>, hold_cycles: u16) -> Self {
 		let mut last_state = Vec::new();
 
 		for r in keymap.iter() {
@@ -35,7 +34,6 @@ impl Keymap {
 
 		Self {
 			keymap,
-			debounce_cycles,
 			hold_cycles,
 			last_state,
 			channel: CHANNEL.publisher().unwrap()
@@ -56,13 +54,13 @@ impl Middleware for Keymap {
 
 			match self.last_state[rindex][cindex].0 {
 				KeyEvent::Released(code) => {
-					if value && self.last_state[rindex][cindex].1 >= self.debounce_cycles {
+					if value {
 						info!("Got a pressed event: {:?}", &code);
 						new_state = KeyEvent::Pressed(self.keymap[rindex][cindex].clone());
 					}
 				},
 				KeyEvent::Pressed(code) => {
-					if value {
+					if !value {
 						info!("Got a released event: {:?}", &code);
 						new_state = KeyEvent::Released(self.keymap[rindex][cindex].clone())
 					}

@@ -54,10 +54,10 @@ impl<'a, I: InputObj, O: OutputObj> RPublisher for Matrix<'a, I, O> {
 				MatrixDirection::Row2Col => (self.outputs.len(), self.inputs.len()),
 			};
 
-			for _ in 0..cols {
+			for _ in 0..rows {
 				self.last_state.push(Vec::new());
 
-				for _ in 0..rows {
+				for _ in 0..cols {
 					self.last_state.last_mut().unwrap().push(false);
 				}
 			}
@@ -68,6 +68,7 @@ impl<'a, I: InputObj, O: OutputObj> RPublisher for Matrix<'a, I, O> {
 impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async move {
+			let mut event_buffer = Vec::new();
 			let num_inputs = self.inputs.len();
 			let num_outputs = self.outputs.len();
 
@@ -82,15 +83,19 @@ impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
 						MatrixDirection::Row2Col => (ii, oi),
 					};
 
-					if state != self.last_state[col][row] {
-						self.last_state[col][row] = state;
+					if state != self.last_state[row][col] {
+						self.last_state[row][col] = state;
 
-						let event = ReactorEvent::HardwareMappedBool(state, col, row);
-						self.channel.publish_immediate(event.clone());
+						let event = ReactorEvent::HardwareMappedBool(state, row, col);
+						event_buffer.push(event);
 					}
 				}
 
 				self.write(oi, false);
+			}
+
+			for event in event_buffer {
+				self.channel.publish(event).await;
 			}
 		})
 	}

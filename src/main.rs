@@ -141,10 +141,9 @@ async fn main(spawner: Spawner) {
 			vec![KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
 			vec![KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
 		],
-		2,
 		2000 / KEYMAP_PERIOD as u16,
 	));
-	spawner.spawn(subscriber_task(keymap)).unwrap();
+	// spawner.spawn(subscriber_task(keymap)).unwrap();
 	info!("Keymap middleware initialized");
 
 	// -- Setup USB HID consumer --
@@ -219,7 +218,8 @@ async fn main(spawner: Spawner) {
 	// info!("Starting advertisement");
 	// spawner.spawn(ble_hid_task(ble_hid)).unwrap();
 	// spawner.spawn(subscriber(ble_hid)).unwrap();
-	spawner.spawn(subscriber_task(usb_hid)).unwrap();
+	// spawner.spawn(subscriber_task(usb_hid)).unwrap();
+	spawner.spawn(subscriber_task([usb_hid, keymap])).unwrap();
 }
 
 #[task]
@@ -235,7 +235,7 @@ async fn poller_task(poller: &'static mut dyn Polled) {
 }
 
 #[task]
-async fn subscriber_task(subscriber: &'static mut dyn RSubscriber) {
+async fn subscriber_task(mut subscribers: [&'static mut dyn RSubscriber; 2]) {
 	info!("Subscriber task started");
 	let mut listener = CHANNEL.subscriber().unwrap();
 	loop {
@@ -246,8 +246,10 @@ async fn subscriber_task(subscriber: &'static mut dyn RSubscriber) {
 		// let valid_subs: Vec<_> = subscribers.iter().filter(|s| s.is_supported(msg.clone())).collect();
 
 		// join!(valid_subs.map(|s| s.push(msg.clone())));
-		if subscriber.is_supported(msg.clone()) {
-			subscriber.push(msg.clone()).await;
+		for sub in &mut subscribers {
+			if sub.is_supported(msg.clone()) {
+				sub.push(msg.clone()).await;
+			}
 		}
 	}
 }
