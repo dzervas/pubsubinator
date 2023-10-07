@@ -3,10 +3,13 @@ use core::pin::Pin;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use defmt::*;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::pubsub::Publisher;
 use futures::Future;
 
 use crate::middleware::Middleware;
 use crate::reactor_event::{ReactorEvent, KeyCode, KeyEvent};
+use crate::{CHANNEL, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 
 pub const KEYMAP_PERIOD: u64 = 2;
 
@@ -15,6 +18,7 @@ pub struct Keymap {
 	pub debounce_cycles: u8,
 	pub hold_cycles: u16,
 	last_state: Vec<Vec<(KeyEvent, u8)>>,
+	channel: Publisher<'static, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
 }
 
 impl Keymap {
@@ -34,6 +38,7 @@ impl Keymap {
 			debounce_cycles,
 			hold_cycles,
 			last_state,
+			channel: CHANNEL.publisher().unwrap()
 		}
 	}
 }
@@ -53,13 +58,13 @@ impl Middleware for Keymap {
 				KeyEvent::Released(code) => {
 					if value && self.last_state[rindex][cindex].1 >= self.debounce_cycles {
 						info!("Got a pressed event: {:?}", &code);
-						new_state = KeyEvent::Pressed(code);
+						new_state = KeyEvent::Pressed(self.keymap[rindex][cindex].clone());
 					}
 				},
 				KeyEvent::Pressed(code) => {
 					if value {
 						info!("Got a released event: {:?}", &code);
-						new_state = KeyEvent::Released(code)
+						new_state = KeyEvent::Released(self.keymap[rindex][cindex].clone())
 					}
 				},
 			};
@@ -67,6 +72,7 @@ impl Middleware for Keymap {
 			if new_state != self.last_state[rindex][cindex].0 {
 				self.last_state[rindex][cindex].0 = new_state;
 				self.last_state[rindex][cindex].1 = 0;
+				self.channel.publish(ReactorEvent::Key(new_state)).await;
 				return Some(ReactorEvent::Key(new_state));
 			}
 

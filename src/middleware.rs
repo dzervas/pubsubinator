@@ -9,7 +9,7 @@ pub trait Middleware {
 	fn process(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = Option<ReactorEvent>> + '_>>;
 }
 
-impl RSubscriber for dyn Middleware {
+impl<T: Middleware> RSubscriber for T {
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn futures::Future<Output = ()> + '_>> {
 		Box::pin(async move {
 			self.process(value).await;

@@ -6,7 +6,6 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use futures::Future;
-use defmt::*;
 use crate::{reactor_event::*, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use crate::reactor::{Polled, RPublisher};
 
@@ -28,8 +27,7 @@ pub struct Matrix<'a, I: InputObj, O: OutputObj> {
 	// TODO: Make these private and create platform-specific constructors
 	pub inputs: Vec<I>,
 	pub outputs: Vec<O>,
-	pub keymap: Vec<Vec<KeyCode>>,
-	pub last_state: Vec<Vec<(KeyEvent, u8)>>,
+	pub last_state: Vec<Vec<bool>>,
 	pub direction: MatrixDirection,
 	pub channel: Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
 }
@@ -51,12 +49,17 @@ impl<'a, I: InputObj, O: OutputObj> Matrix<'a, I, O> {
 impl<'a, I: InputObj, O: OutputObj> RPublisher for Matrix<'a, I, O> {
 	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async {
-			for r in self.keymap.iter() {
-				let mut row = Vec::new();
-				for c in r.iter() {
-					row.push((KeyEvent::Released(c.clone()), 0));
+			let (cols, rows) = match self.direction {
+				MatrixDirection::Col2Row => (self.outputs.len(), self.inputs.len()),
+				MatrixDirection::Row2Col => (self.outputs.len(), self.inputs.len()),
+			};
+
+			for _ in 0..cols {
+				self.last_state.push(Vec::new());
+
+				for _ in 0..rows {
+					self.last_state.last_mut().unwrap().push(false);
 				}
-				self.last_state.push(row);
 			}
 		})
 	}
@@ -65,13 +68,11 @@ impl<'a, I: InputObj, O: OutputObj> RPublisher for Matrix<'a, I, O> {
 impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async move {
-			let mut event_buffer = Vec::new();
 			let num_inputs = self.inputs.len();
 			let num_outputs = self.outputs.len();
 
 			for oi in 0..num_outputs {
 				self.write(oi, true);
-				// Timer::after(Duration::from_micros(10)).await;
 
 				for ii in 0..num_inputs {
 					let state = self.read(ii);
@@ -81,48 +82,15 @@ impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
 						MatrixDirection::Row2Col => (ii, oi),
 					};
 
-					self.last_state[row][col].1 += 1;
+					if state != self.last_state[col][row] {
+						self.last_state[col][row] = state;
 
-					// TODO: Make this a bit more beautiful
-					let new_state: KeyEvent = match &self.last_state[row][col].0 {
-						KeyEvent::Released(code) => {
-							if state && self.last_state[row][col].1 >= DEBOUNCE_CYCLES {
-								info!("Got a pressed event: {:?}", &code);
-								KeyEvent::Pressed(code.clone())
-							} else {
-								KeyEvent::Released(code.clone())
-							}
-						},
-						KeyEvent::Pressed(code) => {
-							if state {
-								KeyEvent::Pressed(code.clone())
-							} else {
-								info!("Got a released event: {:?}", &code);
-								KeyEvent::Released(code.clone())
-							}
-						},
-					};
-
-					if self.last_state[row][col].1 == 255 {
-						match new_state {
-							KeyEvent::Released(_) => self.last_state[row][col].1 = 0,
-							KeyEvent::Pressed(_) => self.last_state[row][col].1 = DEBOUNCE_CYCLES + 1,
-						};
-					}
-
-					if new_state != self.last_state[row][col].0 {
-						// self.channel.publish_immediate(ReactorEvent::Key(new_state.clone()));
-						event_buffer.push(ReactorEvent::Key(new_state.clone()));
-						self.last_state[row][col].0 = new_state;
+						let event = ReactorEvent::HardwareMappedBool(state, col, row);
+						self.channel.publish_immediate(event.clone());
 					}
 				}
 
 				self.write(oi, false);
-			}
-
-			// event_buffer.reverse();
-			for e in event_buffer.iter() {
-				self.channel.publish_immediate(e.clone());
 			}
 		})
 	}

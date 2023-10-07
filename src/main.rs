@@ -53,11 +53,12 @@ use embassy_nrf::{bind_interrupts, peripherals, usb};
 use static_cell::make_static;
 // use usbd_hid::descriptor::KeyboardReport;
 
+use crate::keymap_mid::KEYMAP_PERIOD;
 use crate::matrix::Matrix;
 use crate::nrf::usb_init;
 use crate::nrf::usb_task;
-use crate::reactor::RPublisher;
 use crate::ble_hid::BleHid;
+use crate::reactor::RPublisher;
 use crate::usb_hid::UsbHid;
 
 bind_interrupts!(struct Irqs {
@@ -120,17 +121,10 @@ async fn main(spawner: Spawner) {
 			Input::new(p.P0_30.degrade(), Pull::Down),
 			Input::new(p.P1_14.degrade(), Pull::Down),
 		],
-
 		outputs: vec![
 			Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
 			Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
 			Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-		],
-
-		keymap: vec![
-			vec![KeyCode::Intl1, KeyCode::Intl2, KeyCode::Intl3],
-			vec![KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
-			vec![KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
 		],
 		last_state: vec![],
 		direction: matrix::MatrixDirection::Row2Col,
@@ -139,6 +133,19 @@ async fn main(spawner: Spawner) {
 	matrix.setup().await;
 	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");
+
+	// Keymap middleware
+	let keymap = make_static!(keymap_mid::Keymap::new(
+		vec![
+			vec![KeyCode::Intl1, KeyCode::Intl2, KeyCode::Intl3],
+			vec![KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
+			vec![KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
+		],
+		2,
+		2000 / KEYMAP_PERIOD as u16,
+	));
+	spawner.spawn(subscriber_task(keymap)).unwrap();
+	info!("Keymap middleware initialized");
 
 	// -- Setup USB HID consumer --
 	let mut usb_builder = usb_init(p.USBD);
@@ -212,8 +219,6 @@ async fn main(spawner: Spawner) {
 	// info!("Starting advertisement");
 	// spawner.spawn(ble_hid_task(ble_hid)).unwrap();
 	// spawner.spawn(subscriber(ble_hid)).unwrap();
-
-
 	spawner.spawn(subscriber_task(usb_hid)).unwrap();
 }
 
