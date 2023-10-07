@@ -10,7 +10,7 @@ use static_cell::make_static;
 use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
 
-use crate::reactor::Consumer;
+use crate::reactor::Subscriber;
 use crate::reactor_event::*;
 use crate::nrf::UsbDriver;
 
@@ -48,7 +48,7 @@ impl UsbHid {
 	}
 }
 
-impl Consumer for UsbHid {
+impl Subscriber for UsbHid {
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		if self.writer.is_none() {
 			info!("USB HID writer is not ready");

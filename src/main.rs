@@ -30,7 +30,7 @@ use matrix::MATRIX_PERIOD;
 use nrf_softdevice::raw;
 use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
-use reactor::Consumer;
+use reactor::Subscriber;
 use reactor::Polled;
 use reactor_event::{KeyCode, ReactorEvent};
 
@@ -45,6 +45,8 @@ pub mod reactor_event;
 pub mod usb_hid;
 pub mod ble_hid;
 pub mod nrf;
+pub mod middleware;
+pub mod keymap_mid;
 // pub mod report;
 
 use embassy_nrf::{bind_interrupts, peripherals, usb};
@@ -54,7 +56,7 @@ use static_cell::make_static;
 use crate::matrix::Matrix;
 use crate::nrf::usb_init;
 use crate::nrf::usb_task;
-use crate::reactor::Producer;
+use crate::reactor::Publisher;
 use crate::ble_hid::BleHid;
 use crate::usb_hid::UsbHid;
 
@@ -225,7 +227,7 @@ async fn poller(poller: &'static mut dyn Polled) {
 }
 
 #[task]
-async fn subscriber(subscriber: &'static mut dyn Consumer) {
+async fn subscriber(subscriber: &'static mut dyn Subscriber) {
 	info!("Subscriber task started");
 	let mut listener = CHANNEL.subscriber().unwrap();
 	loop {

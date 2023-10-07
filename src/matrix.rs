@@ -8,7 +8,7 @@ use embedded_hal::digital::v2::{InputPin, OutputPin};
 use futures::Future;
 use defmt::*;
 use crate::{reactor_event::*, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
-use crate::reactor::{Polled, Producer};
+use crate::reactor::{Polled, Publisher};
 
 pub const MATRIX_PERIOD: u64 = 2;
 pub const DEBOUNCE_CYCLES: u8 = 3;
@@ -48,7 +48,7 @@ impl<'a, I: InputObj, O: OutputObj> Matrix<'a, I, O> {
 	}
 }
 
-impl<'a, I: InputObj, O: OutputObj> Producer for Matrix<'a, I, O> {
+impl<'a, I: InputObj, O: OutputObj> Publisher for Matrix<'a, I, O> {
 	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async {
 			for r in self.keymap.iter() {

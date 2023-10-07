@@ -10,7 +10,7 @@ use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
 
-use crate::reactor::Consumer;
+use crate::reactor::Subscriber;
 use crate::reactor_event::*;
 use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 
@@ -132,7 +132,7 @@ impl<'a> BleHid<'a> {
 	}
 }
 
-impl<'a> Consumer for BleHid<'a> {
+impl<'a> Subscriber for BleHid<'a> {
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async move {
 			match value {

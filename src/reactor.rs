@@ -7,17 +7,17 @@ use defmt::*;
 
 use crate::reactor_event::*;
 
-pub trait Producer {
+pub trait Publisher {
 	// async fn setup(&mut self);
 
 	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 }
 
-pub trait Interrupted: Producer {
+pub trait Interrupted: Publisher {
 	async fn handler(&mut self);
 }
 
-pub trait Polled: Producer {
+pub trait Polled: Publisher {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 }
 
@@ -27,7 +27,7 @@ impl<T: Polled> Interrupted for T {
 	}
 }
 
-pub trait Consumer {
+pub trait Subscriber {
 	// fn setup() -> Self where Self: Sized;
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 }
