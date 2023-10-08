@@ -25,6 +25,7 @@ pub async fn usb_task(builder: Builder<'static, UsbDriver>) {
 pub fn usb_init(p_usbd: peripherals::USBD) -> Builder<'static, UsbDriver> {
 	// Required to work with the SoftDevice
 	Interrupt::USBD.set_priority(Priority::P2);
+	Interrupt::SAADC.set_priority(Priority::P2);
 
 	let driver = Driver::new(p_usbd, Irqs, &*VBUS_DETECT);
 

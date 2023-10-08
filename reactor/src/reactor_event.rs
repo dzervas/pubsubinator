@@ -19,7 +19,9 @@ pub enum ReactorEvent {
 	// TODO: Handle the mouse wheel
 	Mouse { x: u32, y: u32 },
 
+	Potentiometer { v: i16 },
 	Joystick { x: i16, y: i16 },
+	FullJoystick { x: i16, y: i16, z: i16 },
 	SpaceMouse { x: i16, y: i16, z: i16, a: i16, b: i16, c: i16 },
 
 	// Battery percentage report

@@ -1,9 +1,10 @@
 use alloc::boxed::Box;
+use embassy_nrf::gpio::AnyPin;
 use core::future::Future;
 use core::pin::Pin;
 use defmt::*;
 
-use embassy_nrf::saadc::Saadc;
+use embassy_nrf::saadc::{Saadc, AnyInput, Gain, Reference, Resistor, Time};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 
@@ -23,10 +24,17 @@ pub struct Analog<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> Analog<'a, N> {
-	pub fn new(p_saadc: SAADC, input: [&'static mut impl Peripheral<P = impl Input>; N]) -> Self {
+	pub fn new(p_saadc: SAADC, input: [impl Peripheral<P = impl Input>; N]) -> Self {
 		let config = embassy_nrf::saadc::Config::default();
 		let mut input_iter = input.into_iter();
-		let channel_config = [(); N].map(|_| embassy_nrf::saadc::ChannelConfig::single_ended(input_iter.next().unwrap()));
+		let channel_config = [(); N].map(|_| {
+			let mut cc = embassy_nrf::saadc::ChannelConfig::single_ended(input_iter.next().unwrap());
+			cc.gain = Gain::GAIN1;
+			cc.reference = Reference::VDD1_4;
+			cc.resistor = Resistor::VDD1_2;
+			cc.time = Time::_3US;
+			cc
+		});
 		let saadc: Saadc<'a, N> = Saadc::new(p_saadc, Irqs, config, channel_config);
 
 		Self {
