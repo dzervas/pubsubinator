@@ -2,7 +2,6 @@
 #![no_main]
 #![feature(async_fn_in_trait)]
 #![feature(generic_arg_infer)]
-// #![feature(generic_const_exprs)]
 #![feature(trait_alias)]
 #![feature(type_alias_impl_trait)]
 
@@ -30,35 +29,31 @@ use matrix::MATRIX_PERIOD;
 use nrf_softdevice::raw;
 use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
+use reactor::RPublisher;
 use reactor::RSubscriber;
 use reactor::Polled;
-use reactor_event::{KeyCode, ReactorEvent};
+use reactor::reactor_event::{KeyCode, ReactorEvent};
 
 use embedded_alloc::Heap;
 
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
-pub mod matrix;
-pub mod reactor;
-pub mod reactor_event;
-pub mod usb_hid;
-pub mod ble_hid;
-pub mod nrf;
-pub mod middleware;
-pub mod keymap_mid;
-// pub mod report;
-
 use embassy_nrf::{bind_interrupts, peripherals, usb};
 use static_cell::make_static;
 // use usbd_hid::descriptor::KeyboardReport;
+
+pub mod matrix;
+pub mod usb_hid;
+pub mod ble_hid;
+pub mod nrf;
+pub mod keymap_mid;
 
 use crate::keymap_mid::KEYMAP_PERIOD;
 use crate::matrix::Matrix;
 use crate::nrf::usb_init;
 use crate::nrf::usb_task;
 use crate::ble_hid::BleHid;
-use crate::reactor::RPublisher;
 use crate::usb_hid::UsbHid;
 
 bind_interrupts!(struct Irqs {
@@ -219,7 +214,10 @@ async fn main(spawner: Spawner) {
 	// spawner.spawn(ble_hid_task(ble_hid)).unwrap();
 	// spawner.spawn(subscriber(ble_hid)).unwrap();
 	// spawner.spawn(subscriber_task(usb_hid)).unwrap();
-	spawner.spawn(subscriber_task([usb_hid, keymap])).unwrap();
+	// spawner.spawn(subscriber_task([usb_hid, keymap])).unwrap();
+
+	let subs_task = reactor_macros::subscribers_task!([usb_hid, keymap]);
+	spawner.spawn(subs_task).unwrap();
 }
 
 #[task]

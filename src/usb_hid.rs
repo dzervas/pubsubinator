@@ -10,8 +10,8 @@ use static_cell::make_static;
 use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
 
-use crate::reactor::RSubscriber;
-use crate::reactor_event::*;
+use reactor::RSubscriber;
+use reactor::reactor_event::*;
 use crate::nrf::UsbDriver;
 
 pub struct UsbHid {

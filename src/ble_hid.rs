@@ -10,8 +10,8 @@ use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
 
-use crate::reactor::RSubscriber;
-use crate::reactor_event::*;
+use reactor::RSubscriber;
+use reactor::reactor_event::*;
 use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 
 #[nrf_softdevice::gatt_service(uuid = "180f")]

@@ -1,11 +1,17 @@
+#![no_std]
+#![feature(async_fn_in_trait)]
+
+extern crate alloc;
+
 use core::pin::Pin;
 
 use alloc::boxed::Box;
 use futures::Future;
-#[allow(unused_imports)]
-use defmt::*;
 
-use crate::reactor_event::*;
+pub mod reactor_event;
+pub mod middleware;
+
+pub use crate::reactor_event::*;
 
 pub trait RPublisher {
 	// async fn setup(&mut self);

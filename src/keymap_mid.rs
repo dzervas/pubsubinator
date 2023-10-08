@@ -7,8 +7,8 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 use futures::Future;
 
-use crate::middleware::Middleware;
-use crate::reactor_event::{ReactorEvent, KeyCode, KeyEvent};
+use reactor::middleware::Middleware;
+use reactor::reactor_event::*;
 use crate::{CHANNEL, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 
 pub const KEYMAP_PERIOD: u64 = 2;

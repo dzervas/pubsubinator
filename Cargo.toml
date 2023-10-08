@@ -40,11 +40,12 @@ usb-device = { version = "0.2.9", features = ["defmt"] }
 # TODO: Needs critical-section-impl?
 nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-# nrf-softdevice-s140 = { git = "https://github.com/embassy-rs/nrf-softdevice" }
+
+reactor = { version = "0.1.0", path = "reactor" }
+reactor-macros = { version = "0.1.0", path = "reactor-macros" }
 
 [features]
 default = [
-	"nrf",
 	"nrf52840",
 	"nightly",
 ]
@@ -53,7 +54,6 @@ default = [
 rp = ["dep:embassy-rp"]
 nrf = ["dep:embassy-nrf"]
 stm32 = ["dep:embassy-stm32"]
-nrf52840 = []
 nightly = [
 	"static_cell/nightly",
 	"embassy-usb",
@@ -62,3 +62,7 @@ nightly = [
 	"embassy-nrf/nightly",
 	"nrf-softdevice/nightly"
 ]
+
+# nrf targets
+
+nrf52840 = ["nrf"]

@@ -3,7 +3,8 @@ use core::pin::Pin;
 use alloc::boxed::Box;
 use futures::Future;
 
-use crate::{reactor_event::ReactorEvent, reactor::RSubscriber};
+use crate::reactor_event::ReactorEvent;
+use crate::RSubscriber;
 
 pub trait Middleware {
 	fn process(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = Option<ReactorEvent>> + '_>>;
