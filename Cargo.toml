@@ -1,5 +1,5 @@
 [package]
-name = "clackrust"
+name = "pubsubinator"
 version = "0.1.2"
 edition = "2021"
 

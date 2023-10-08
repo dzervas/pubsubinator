@@ -92,7 +92,7 @@ async fn ble_hid_task(ble_hid: &'static mut BleHid<'static>) {
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-	info!("Hi from RustRover!");
+	info!("PubSubinator v{}", env!("CARGO_PKG_VERSION"));
 	{
 		use core::mem::MaybeUninit;
 		const HEAP_SIZE: usize = 1024;

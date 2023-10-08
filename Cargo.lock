@@ -154,39 +154,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "clackrust"
-version = "0.1.2"
-dependencies = [
- "cortex-m",
- "cortex-m-rt",
- "defmt",
- "defmt-rtt",
- "embassy-executor",
- "embassy-futures 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "embassy-nrf",
- "embassy-rp",
- "embassy-stm32",
- "embassy-sync 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "embassy-time 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "embassy-usb",
- "embedded-alloc",
- "embedded-hal 0.2.7",
- "embedded-hal-async",
- "embedded-hal-bus",
- "fixed",
- "futures",
- "lazy_static",
- "nrf-softdevice",
- "panic-probe",
- "rand",
- "reactor",
- "reactor-macros",
- "static_cell",
- "usb-device",
- "usbd-hid",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1447,6 +1414,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b1106fec09662ec6dd98ccac0f81cef56984d0b49f75c92d8cbad76e20c005c"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "pubsubinator"
+version = "0.1.2"
+dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
+ "defmt",
+ "defmt-rtt",
+ "embassy-executor",
+ "embassy-futures 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embassy-nrf",
+ "embassy-rp",
+ "embassy-stm32",
+ "embassy-sync 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embassy-time 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embassy-usb",
+ "embedded-alloc",
+ "embedded-hal 0.2.7",
+ "embedded-hal-async",
+ "embedded-hal-bus",
+ "fixed",
+ "futures",
+ "lazy_static",
+ "nrf-softdevice",
+ "panic-probe",
+ "rand",
+ "reactor",
+ "reactor-macros",
+ "static_cell",
+ "usb-device",
+ "usbd-hid",
 ]
 
 [[package]]

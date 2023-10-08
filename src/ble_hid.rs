@@ -88,7 +88,7 @@ impl<'a> BleHid<'a> {
 		let adv_data = &[
 			0x02, 0x01, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
 			0x03, 0x03, 0x12, 0x18, // 3 bytes wide, HID service
-			// 0x0a, 0x09, b"RustRover"[..],
+			// 0x0a, 0x09, b"PubSubinator"[..],
 			0x0a, 0x09, b'R', b'u', b's', b't', b'R', b'o', b'v', b'e', b'r',
 		];
 		#[rustfmt::skip]
