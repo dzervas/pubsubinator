@@ -17,17 +17,12 @@ use defmt::*;
 use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
 
 use embassy_executor::{task, Spawner};
-use embassy_nrf::interrupt::Priority;
-use embassy_nrf::usb::vbus_detect::SoftwareVbusDetect;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::PubSubChannel;
 use embassy_time::Duration;
 use embassy_time::Ticker;
 use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
-use nrf_softdevice::raw;
-use nrf_softdevice::SocEvent;
-use nrf_softdevice::Softdevice;
 use reactor::RSubscriber;
 use reactor::Polled;
 use reactor::reactor_event::{KeyCode, ReactorEvent};
@@ -37,11 +32,17 @@ use embedded_alloc::Heap;
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
-use embassy_nrf::{bind_interrupts, peripherals, usb};
+use embassy_nrf::interrupt::Priority;
+use embassy_nrf::usb::vbus_detect::SoftwareVbusDetect;
+use nrf_softdevice::raw;
+use nrf_softdevice::SocEvent;
+use nrf_softdevice::Softdevice;
+use embassy_nrf::{bind_interrupts, peripherals, usb, saadc};
 use static_cell::make_static;
 // use usbd_hid::descriptor::KeyboardReport;
 
 pub mod matrix;
+pub mod analog_nrf;
 pub mod usb_hid;
 pub mod ble_hid;
 pub mod nrf;
@@ -56,6 +57,7 @@ use crate::usb_hid::UsbHid;
 
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;
+	SAADC => saadc::InterruptHandler;
 });
 
 pub const PUBSUB_CAPACITY: usize = 20 * size_of::<ReactorEvent>();

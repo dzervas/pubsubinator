@@ -25,11 +25,11 @@ pub trait OutputObj = OutputPin<Error = Infallible>;
 pub struct Matrix<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> {
 	// TODO: Use slices instead of vectors
 	// TODO: Make these private and create platform-specific constructors
-	pub inputs: [I; IC],
-	pub outputs: [O; OC],
-	pub last_state: [[bool; OC]; IC],
-	pub direction: MatrixDirection,
-	pub channel: Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
+	inputs: [I; IC],
+	outputs: [O; OC],
+	last_state: [[bool; OC]; IC],
+	direction: MatrixDirection,
+	channel: Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
 }
 
 impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Matrix<'a, I, O, IC, OC> {
@@ -58,8 +58,7 @@ impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Matrix<'a,
 	}
 }
 
-impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> RPublisher for Matrix<'a, I, O, IC, OC> {
-}
+impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> RPublisher for Matrix<'a, I, O, IC, OC> {}
 
 impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Polled for Matrix<'a, I, O, IC, OC> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
