@@ -21,7 +21,6 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::PubSubChannel;
 use embassy_time::Duration;
 use embassy_time::Ticker;
-use embassy_time::Timer;
 use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
 use reactor::RSubscriber;
@@ -49,6 +48,7 @@ pub mod ble_hid;
 pub mod nrf;
 pub mod keymap_mid;
 
+#[allow(unused_imports)]
 use crate::analog_nrf::Analog;
 use crate::keymap_mid::KEYMAP_PERIOD;
 use crate::matrix::Matrix;
@@ -112,40 +112,40 @@ async fn main(spawner: Spawner) {
 
 	// -- Setup Matrix publisher --
 
-	// let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>, _, _> = make_static!(matrix::Matrix::new(
-	// 	[
-	// 		Input::new(p.P0_04.degrade(), Pull::Down),
-	// 		Input::new(p.P0_30.degrade(), Pull::Down),
-	// 		Input::new(p.P1_14.degrade(), Pull::Down),
-	// 	],
-	// 	[
-	// 		Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 		Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 		Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 	],
-	// 	matrix::MatrixDirection::Row2Col,
-	// ));
-	// spawner.spawn(poller_task(matrix)).unwrap();
-	// info!("Matrix publisher initialized");
+	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>, _, _> = make_static!(matrix::Matrix::new(
+		[
+			Input::new(p.P0_04.degrade(), Pull::Down),
+			Input::new(p.P0_30.degrade(), Pull::Down),
+			Input::new(p.P1_14.degrade(), Pull::Down),
+		],
+		[
+			Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+			Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+		],
+		matrix::MatrixDirection::Row2Col,
+	));
+	spawner.spawn(poller_task(matrix)).unwrap();
+	info!("Matrix publisher initialized");
 
 	// -- Setup Keymap middleware --
-	// let keymap = make_static!(keymap_mid::Keymap::new(
-	// 	[
-	// 		[KeyCode::Intl1, KeyCode::Intl2, KeyCode::Intl3],
-	// 		[KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
-	// 		[KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
-	// 	],
-	// 	2000 / KEYMAP_PERIOD as u16,
-	// ));
-	// info!("Keymap middleware initialized");
+	let keymap = make_static!(keymap_mid::Keymap::new(
+		[
+			[KeyCode::Intl1, KeyCode::Intl2, KeyCode::Intl3],
+			[KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
+			[KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
+		],
+		2000 / KEYMAP_PERIOD as u16,
+	));
+	info!("Keymap middleware initialized");
 
 	// -- Setup Analog publisher --
 
-	let analog = make_static!(Analog::new(p.SAADC, [
-		Into::<saadc::AnyInput>::into(p.P0_03),
-		Into::<saadc::AnyInput>::into(p.P0_04),
-	]));
-	spawner.spawn(poller_task(analog)).unwrap();
+	// let analog = make_static!(Analog::new(p.SAADC, [
+	// 	Into::<saadc::AnyInput>::into(p.P0_03),
+	// 	Into::<saadc::AnyInput>::into(p.P0_04),
+	// ]));
+	// spawner.spawn(poller_task(analog)).unwrap();
 
 	// -- Setup USB HID consumer --
 	let mut usb_builder = usb_init(p.USBD);
@@ -222,8 +222,7 @@ async fn main(spawner: Spawner) {
 	// spawner.spawn(subscriber_task(usb_hid)).unwrap();
 	// spawner.spawn(subscriber_task([usb_hid, keymap])).unwrap();
 
-	// let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid, keymap]);
-	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid]);
+	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid, keymap]);
 	spawner.spawn(subs_task).unwrap();
 }
 

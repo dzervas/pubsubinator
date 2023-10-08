@@ -1,10 +1,9 @@
 use alloc::boxed::Box;
-use embassy_nrf::gpio::AnyPin;
 use core::future::Future;
 use core::pin::Pin;
 use defmt::*;
 
-use embassy_nrf::saadc::{Saadc, AnyInput, Gain, Reference, Resistor, Time};
+use embassy_nrf::saadc::{Saadc, Gain, Reference, Resistor, Time};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 
@@ -52,6 +51,7 @@ impl<'a, const N: usize> Polled for Analog<'a, N> {
 		Box::pin(async {
 			let mut buf = [0; N];
 
+			// TODO: It's VERY slow - about 1s
 			self.input.sample(&mut buf).await;
 
 			info!("ADC sample: {}", buf);
