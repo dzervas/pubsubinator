@@ -9,6 +9,17 @@ pub enum KeyEvent {
 	// DoublePressed(KeyCode),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Format)]
+pub enum InternalEvent {
+	LayerNext,
+	LayerPrev,
+	LayerChange(usize),
+
+	BLENext,
+	BLEPrev,
+	BLEChange(usize),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
 pub enum ReactorEvent {
 	// Keyboard
@@ -292,4 +303,10 @@ pub enum KeyCode {
 	MediaCoffee,
 	MediaRefresh,
 	MediaCalc, // 0xFB
+}
+
+pub enum KeyCodeInt {
+	None,
+	Key(KeyCode),
+	Internal(InternalEvent),
 }

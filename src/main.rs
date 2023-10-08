@@ -26,6 +26,7 @@ use matrix::MATRIX_PERIOD;
 use reactor::RSubscriber;
 use reactor::Polled;
 use reactor::reactor_event::{KeyCode, ReactorEvent};
+use reactor::reactor_event::KeyCodeInt::Key;
 
 use embedded_alloc::Heap;
 
@@ -130,11 +131,11 @@ async fn main(spawner: Spawner) {
 
 	// -- Setup Keymap middleware --
 	let keymap = make_static!(keymap_mid::Keymap::new(
-		[
-			[KeyCode::Intl1, KeyCode::Intl2, KeyCode::Intl3],
-			[KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
-			[KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
-		],
+		[[
+			[Key(KeyCode::Intl1), Key(KeyCode::Intl2), Key(KeyCode::Intl3)],
+			[Key(KeyCode::Intl4), Key(KeyCode::Intl5), Key(KeyCode::Intl6)],
+			[Key(KeyCode::Intl7), Key(KeyCode::Intl8), Key(KeyCode::Intl9)],
+		]],
 		2000 / KEYMAP_PERIOD as u16,
 	));
 	info!("Keymap middleware initialized");
