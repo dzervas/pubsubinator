@@ -216,7 +216,7 @@ async fn main(spawner: Spawner) {
 	// spawner.spawn(subscriber_task(usb_hid)).unwrap();
 	// spawner.spawn(subscriber_task([usb_hid, keymap])).unwrap();
 
-	let subs_task = reactor_macros::subscribers_task!([usb_hid, keymap]);
+	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid, keymap]);
 	spawner.spawn(subs_task).unwrap();
 }
 
