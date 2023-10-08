@@ -42,27 +42,64 @@ impl<'a, const N: usize> Analog<'a, N> {
 			channel: crate::CHANNEL.publisher().unwrap(),
 		}
 	}
+
+	async fn _poll_internal(&mut self) -> Option<[i16; N]> {
+		let mut buf = [0; N];
+
+		// TODO: It's VERY slow - about 1s
+		self.input.sample(&mut buf).await;
+
+		info!("ADC sample: {}", buf);
+
+		if buf == self.last_state {
+			return None;
+		}
+		self.last_state = buf;
+
+		// TODO: Maybe produce different events based on the number of inputs
+		Some(buf)
+	}
 }
 
 impl<'a, const N: usize> RPublisher for Analog<'a, N> {}
 
-impl<'a, const N: usize> Polled for Analog<'a, N> {
+impl<'a> Polled for Analog<'a, 1> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async {
-			let mut buf = [0; N];
-
-			// TODO: It's VERY slow - about 1s
-			self.input.sample(&mut buf).await;
-
-			info!("ADC sample: {}", buf);
-
-			if buf == self.last_state {
-				return;
+			if let Some(buf) = self._poll_internal().await {
+				self.channel.publish(ReactorEvent::Potentiometer { v: buf[0] }).await;
 			}
-			self.last_state = buf;
+		})
+	}
+}
 
-			// TODO: Produce different events based on the number of inputs
-			self.channel.publish(ReactorEvent::Joystick { x: buf[0], y: buf[1] }).await;
+
+impl<'a> Polled for Analog<'a, 2> {
+	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
+		Box::pin(async {
+			if let Some(buf) = self._poll_internal().await {
+				self.channel.publish(ReactorEvent::Joystick { x: buf[0], y: buf[1] }).await;
+			}
+		})
+	}
+}
+
+impl<'a> Polled for Analog<'a, 3> {
+	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
+		Box::pin(async {
+			if let Some(buf) = self._poll_internal().await {
+				self.channel.publish(ReactorEvent::FullJoystick { x: buf[0], y: buf[1], z: buf[2] }).await;
+			}
+		})
+	}
+}
+
+impl<'a> Polled for Analog<'a, 6> {
+	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
+		Box::pin(async {
+			if let Some(buf) = self._poll_internal().await {
+				self.channel.publish(ReactorEvent::SpaceMouse { x: buf[0], y: buf[1], z: buf[2], a: buf[3], b: buf[4], c: buf[5] }).await;
+			}
 		})
 	}
 }
