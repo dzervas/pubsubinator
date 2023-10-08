@@ -13,11 +13,7 @@ pub mod middleware;
 
 pub use crate::reactor_event::*;
 
-pub trait RPublisher {
-	// async fn setup(&mut self);
-
-	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>>;
-}
+pub trait RPublisher {}
 
 pub trait Interrupted: RPublisher {
 	async fn handler(&mut self);

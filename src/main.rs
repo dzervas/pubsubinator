@@ -13,7 +13,6 @@ extern crate embassy_nrf;
 use core::mem;
 use core::mem::size_of;
 
-use alloc::vec;
 use defmt::*;
 use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
 
@@ -29,7 +28,6 @@ use matrix::MATRIX_PERIOD;
 use nrf_softdevice::raw;
 use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
-use reactor::RPublisher;
 use reactor::RSubscriber;
 use reactor::Polled;
 use reactor::reactor_event::{KeyCode, ReactorEvent};
@@ -110,31 +108,28 @@ async fn main(spawner: Spawner) {
 
 	// -- Setup Matrix publisher --
 
-	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>> = make_static!(matrix::Matrix {
-		inputs: vec![
+	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>, _, _> = make_static!(matrix::Matrix::new(
+		[
 			Input::new(p.P0_04.degrade(), Pull::Down),
 			Input::new(p.P0_30.degrade(), Pull::Down),
 			Input::new(p.P1_14.degrade(), Pull::Down),
 		],
-		outputs: vec![
+		[
 			Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
 			Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
 			Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
 		],
-		last_state: vec![],
-		direction: matrix::MatrixDirection::Row2Col,
-		channel: CHANNEL.publisher().unwrap(),
-	});
-	matrix.setup().await;
+		matrix::MatrixDirection::Row2Col,
+	));
 	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");
 
 	// Keymap middleware
 	let keymap = make_static!(keymap_mid::Keymap::new(
-		vec![
-			vec![KeyCode::Intl1, KeyCode::Intl2, KeyCode::Intl3],
-			vec![KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
-			vec![KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
+		[
+			[KeyCode::Intl1, KeyCode::Intl2, KeyCode::Intl3],
+			[KeyCode::Intl4, KeyCode::Intl5, KeyCode::Intl6],
+			[KeyCode::Intl7, KeyCode::Intl8, KeyCode::Intl9],
 		],
 		2000 / KEYMAP_PERIOD as u16,
 	));

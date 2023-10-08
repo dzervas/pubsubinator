@@ -1,7 +1,6 @@
 use core::pin::Pin;
 
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use defmt::*;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
@@ -13,24 +12,16 @@ use crate::{CHANNEL, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 
 pub const KEYMAP_PERIOD: u64 = 2;
 
-pub struct Keymap {
-	keymap: Vec<Vec<KeyCode>>,
+pub struct Keymap<const R: usize, const C: usize> {
+	keymap: [[KeyCode; C]; R],
 	pub hold_cycles: u16,
-	last_state: Vec<Vec<(KeyEvent, u8)>>,
+	last_state: [[(KeyEvent, u8); C]; R],
 	channel: Publisher<'static, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
 }
 
-impl Keymap {
-	pub fn new(keymap: Vec<Vec<KeyCode>>, hold_cycles: u16) -> Self {
-		let mut last_state = Vec::new();
-
-		for r in keymap.iter() {
-			let mut row = Vec::new();
-			for c in r.iter() {
-				row.push((KeyEvent::Released(c.clone()), 0));
-			}
-			last_state.push(row);
-		}
+impl<const R: usize, const C: usize> Keymap<R, C> {
+	pub fn new(keymap: [[KeyCode; C]; R], hold_cycles: u16) -> Self {
+		let last_state = [[(KeyEvent::Released(KeyCode::None), 0); C]; R];
 
 		Self {
 			keymap,
@@ -42,7 +33,7 @@ impl Keymap {
 }
 
 // TODO: Specify the is_supported
-impl Middleware for Keymap {
+impl<const R: usize, const C: usize> Middleware for Keymap<R, C> {
 	fn process(&mut self, event: ReactorEvent) -> Pin<Box<dyn Future<Output = Option<ReactorEvent>> + '_>> {
 		Box::pin(async move {
 			let (value, rindex, cindex) = match event {

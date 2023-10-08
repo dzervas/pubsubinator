@@ -11,7 +11,6 @@ use reactor::reactor_event::*;
 use reactor::{Polled, RPublisher};
 
 pub const MATRIX_PERIOD: u64 = 2;
-pub const DEBOUNCE_CYCLES: u8 = 3;
 // pub const HOLD_CYCLES: u8 = 200;
 
 pub enum MatrixDirection {
@@ -23,17 +22,29 @@ pub trait InputObj = InputPin<Error = Infallible>;
 pub trait OutputObj = OutputPin<Error = Infallible>;
 
 // TODO: Dynamic size
-pub struct Matrix<'a, I: InputObj, O: OutputObj> {
+pub struct Matrix<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> {
 	// TODO: Use slices instead of vectors
 	// TODO: Make these private and create platform-specific constructors
-	pub inputs: Vec<I>,
-	pub outputs: Vec<O>,
-	pub last_state: Vec<Vec<bool>>,
+	pub inputs: [I; IC],
+	pub outputs: [O; OC],
+	pub last_state: [[bool; OC]; IC],
 	pub direction: MatrixDirection,
 	pub channel: Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
 }
 
-impl<'a, I: InputObj, O: OutputObj> Matrix<'a, I, O> {
+impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Matrix<'a, I, O, IC, OC> {
+	pub fn new(inputs: [I; IC], outputs: [O; OC], direction: MatrixDirection) -> Self {
+		let last_state = [[false; OC]; IC];
+
+		Self {
+			inputs,
+			outputs,
+			last_state,
+			direction,
+			channel: crate::CHANNEL.publisher().unwrap()
+		}
+	}
+
 	fn read(&self, index: usize) -> bool {
 		self.inputs[index].is_high().unwrap()
 	}
@@ -47,26 +58,10 @@ impl<'a, I: InputObj, O: OutputObj> Matrix<'a, I, O> {
 	}
 }
 
-impl<'a, I: InputObj, O: OutputObj> RPublisher for Matrix<'a, I, O> {
-	fn setup(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
-		Box::pin(async {
-			let (cols, rows) = match self.direction {
-				MatrixDirection::Col2Row => (self.outputs.len(), self.inputs.len()),
-				MatrixDirection::Row2Col => (self.outputs.len(), self.inputs.len()),
-			};
-
-			for _ in 0..rows {
-				self.last_state.push(Vec::new());
-
-				for _ in 0..cols {
-					self.last_state.last_mut().unwrap().push(false);
-				}
-			}
-		})
-	}
+impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> RPublisher for Matrix<'a, I, O, IC, OC> {
 }
 
-impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
+impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Polled for Matrix<'a, I, O, IC, OC> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async move {
 			let mut event_buffer = Vec::new();
