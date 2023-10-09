@@ -40,7 +40,6 @@ use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
 use embassy_nrf::{bind_interrupts, peripherals, usb, saadc};
 use static_cell::make_static;
-// use usbd_hid::descriptor::KeyboardReport;
 
 pub mod matrix;
 pub mod analog_nrf;
@@ -219,9 +218,6 @@ async fn main(spawner: Spawner) {
 
 	// info!("Starting advertisement");
 	// spawner.spawn(ble_hid_task(ble_hid)).unwrap();
-	// spawner.spawn(subscriber(ble_hid)).unwrap();
-	// spawner.spawn(subscriber_task(usb_hid)).unwrap();
-	// spawner.spawn(subscriber_task([usb_hid, keymap])).unwrap();
 
 	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid, keymap]);
 	spawner.spawn(subs_task).unwrap();
