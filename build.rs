@@ -13,13 +13,28 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
+use fdt::Fdt;
+
 fn main() {
+	let fdt = Fdt::new(include_bytes!(env!("TARGET_DTS"))).unwrap();
+
+	// println!("cargo:warning=Memory: {:?}", );
+
 	// Put `memory.x` in our output directory and ensure it's
 	// on the linker search path.
 	let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
 	File::create(out.join("memory.x"))
 		.unwrap()
 		.write_all(include_bytes!("memory.x"))
+// 		.write_all(format!("
+// MEMORY
+// {{
+//   FLASH    : ORIGIN = 0x{:?}, LENGTH = 0x{}
+//   RAM (rw) : ORIGIN = 0x{}, LENGTH = 0x{}
+// }}
+// ",
+// ram.starting_address, ram.size.unwrap(),
+// flash.starting_address, flash.size()))
 		.unwrap();
 	println!("cargo:rustc-link-search={}", out.display());
 

@@ -66,3 +66,6 @@ nightly = [
 # nrf targets
 
 nrf52840 = ["nrf"]
+
+[build-dependencies]
+fdt = { version = "0.1.5", features = ["pretty-printing"] }
