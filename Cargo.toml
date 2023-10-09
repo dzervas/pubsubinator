@@ -68,4 +68,5 @@ nightly = [
 nrf52840 = ["nrf"]
 
 [build-dependencies]
-fdt = { version = "0.1.5", features = ["pretty-printing"] }
+serde = { version = "1.0.188", features = ["derive"] }
+serde_yaml = "0.9.25"

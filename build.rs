@@ -12,13 +12,37 @@ use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::collections::HashMap;
 
-use fdt::Fdt;
+use serde::Deserialize;
+use serde_yaml::Value;
+
+#[derive(Debug, Deserialize)]
+struct Config {
+	name: String,
+	features: Vec<String>,
+	structs: Vec<StructConfig>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct StructConfig {
+	#[serde(rename = "type")]
+	type_name: String,
+
+	#[serde(flatten)]
+	arguments: HashMap<String, Value>,
+}
 
 fn main() {
-	let fdt = Fdt::new(include_bytes!(env!("TARGET_DTS"))).unwrap();
+	let config: Config = serde_yaml::from_str(include_str!(env!("TARGET_CONFIG"))).unwrap();
 
-	// println!("cargo:warning=Memory: {:?}", );
+	println!("cargo:warning=Config: {:?}", config);
+
+	env::set_var("CONFIG_NAME", config.name);
+
+	for struct_config in config.structs {
+
+	}
 
 	// Put `memory.x` in our output directory and ensure it's
 	// on the linker search path.
