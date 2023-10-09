@@ -9,57 +9,14 @@
 //! new memory settings.
 
 use std::env;
-use std::fs::File;
-use std::io::Write;
+use std::fs::copy;
 use std::path::PathBuf;
-use std::collections::HashMap;
-
-use serde::Deserialize;
-use serde_yaml::Value;
-
-#[derive(Debug, Deserialize)]
-struct Config {
-	name: String,
-	features: Vec<String>,
-	structs: Vec<StructConfig>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct StructConfig {
-	#[serde(rename = "type")]
-	type_name: String,
-
-	#[serde(flatten)]
-	arguments: HashMap<String, Value>,
-}
 
 fn main() {
-	let config: Config = serde_yaml::from_str(include_str!(env!("TARGET_CONFIG"))).unwrap();
-
-	println!("cargo:warning=Config: {:?}", config);
-
-	env::set_var("CONFIG_NAME", config.name);
-
-	for struct_config in config.structs {
-
-	}
-
 	// Put `memory.x` in our output directory and ensure it's
 	// on the linker search path.
 	let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-	File::create(out.join("memory.x"))
-		.unwrap()
-		.write_all(include_bytes!("memory.x"))
-// 		.write_all(format!("
-// MEMORY
-// {{
-//   FLASH    : ORIGIN = 0x{:?}, LENGTH = 0x{}
-//   RAM (rw) : ORIGIN = 0x{}, LENGTH = 0x{}
-// }}
-// ",
-// ram.starting_address, ram.size.unwrap(),
-// flash.starting_address, flash.size()))
-		.unwrap();
+	copy("memory.x", out.join("memory.x")).unwrap();
 	println!("cargo:rustc-link-search={}", out.display());
 
 	// By default, Cargo will re-run a build script whenever
