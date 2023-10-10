@@ -10,7 +10,6 @@ extern crate defmt_rtt;
 extern crate panic_probe;
 extern crate embassy_nrf;
 
-use core::mem;
 use core::mem::size_of;
 
 use defmt::*;
@@ -23,10 +22,10 @@ use embassy_time::Duration;
 use embassy_time::Ticker;
 use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
-use reactor::RSubscriber;
 use reactor::Polled;
 use reactor::reactor_event::{KeyCode, ReactorEvent};
 use reactor::reactor_event::KeyCodeInt::Key;
+use static_cell::make_static;
 
 use embedded_alloc::Heap;
 
@@ -39,7 +38,14 @@ use nrf_softdevice::raw;
 use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
 use embassy_nrf::{bind_interrupts, peripherals, usb, saadc};
-use static_cell::make_static;
+
+// BLE HID
+// TODO: Use the generic HID report
+use usbd_hid::descriptor::KeyboardReport;
+// use nrf_softdevice::ble::gatt_server::builder::ServiceBuilder;
+// use nrf_softdevice::ble::gatt_server::characteristic::Attribute;
+// use nrf_softdevice::ble::gatt_server::characteristic::{Metadata, Properties};
+// use nrf_softdevice::ble::Uuid;
 
 pub mod matrix;
 pub mod analog_nrf;
@@ -178,46 +184,50 @@ async fn main(spawner: Spawner) {
 			adv_set_count: 1,
 			periph_role_count: 3,
 			central_role_count: 3,
-			central_sec_count: 0,
+			central_sec_count: 3,
 			_bitfield_1: raw::ble_gap_cfg_role_count_t::new_bitfield_1(0),
 		}),
 		gap_device_name: Some(raw::ble_gap_cfg_device_name_t {
-			p_value: b"HelloRust" as *const u8 as _,
-			current_len: 9,
-			max_len: 9,
-			write_perm: unsafe { mem::zeroed() },
+			p_value: b"PubSubinator" as *const u8 as _,
+			current_len: 12,
+			max_len: 12,
+			write_perm: raw::ble_gap_conn_sec_mode_t {
+				_bitfield_1: raw::ble_gap_conn_sec_mode_t::new_bitfield_1(1, 4),
+			},
 			_bitfield_1: raw::ble_gap_cfg_device_name_t::new_bitfield_1(raw::BLE_GATTS_VLOC_STACK as u8),
 		}),
 		..Default::default()
 	};
 
 	let sd = Softdevice::enable(&sd_config);
-	// let server = unwrap!(ble_hid::Server::new(sd));
-	spawner.spawn(softdevice_task(sd)).unwrap();
-	info!("SoftDevice initialized");
+	let server = unwrap!(ble_hid::Server::new(sd));
 
 	// -- Setup BLE HID consumer --
 	// let services = ServiceBuilder::new(sd, Uuid::new_16(0x1812)).unwrap()
-	// 	.add_characteristic(Uuid::new_16(0x2A4B), ble_hid::HidReportAttribute::new(), Metadata::new(Properties {
+	// 	.add_characteristic(Uuid::new_16(0x2A4B), Attribute::new([0, 0, 0]), Metadata::new(Properties {
 	// 		read: true,
 	// 		..Default::default()
 	// 	})).unwrap()
 	// 	.build();
 
-	// let ble_hid = make_static!(BleHid {
-	// 	softdevice: sd,
-	// 	server,
-	// 	report: KeyboardReport {
-	// 		modifier: 0,
-	// 		reserved: 0,
-	// 		leds: 0,
-	// 		keycodes: [0; 6],
-	// 	},
-	// 	channel: CHANNEL.subscriber().unwrap(),
-	// });
+	let ble_hid = make_static!(BleHid {
+		softdevice: sd,
+		server,
+		report: KeyboardReport {
+			modifier: 0,
+			reserved: 0,
+			leds: 0,
+			keycodes: [0; 6],
+		},
+		security_handler: make_static!(ble_hid::Bonder::default()),
+		channel: CHANNEL.subscriber().unwrap(),
+	});
 
-	// info!("Starting advertisement");
-	// spawner.spawn(ble_hid_task(ble_hid)).unwrap();
+	info!("Starting advertisement");
+	spawner.spawn(ble_hid_task(ble_hid)).unwrap();
+
+	spawner.spawn(softdevice_task(sd)).unwrap();
+	info!("SoftDevice initialized");
 
 	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid, keymap]);
 	spawner.spawn(subs_task).unwrap();
@@ -233,25 +243,5 @@ async fn poller_task(poller: &'static mut dyn Polled) {
 		poller.poll().await;
 		ticker.next().await;
 		// Timer::after(Duration::from_millis(100)).await;
-	}
-}
-
-#[task]
-async fn subscriber_task(mut subscribers: [&'static mut dyn RSubscriber; 2]) {
-	info!("Subscriber task started");
-	let mut listener = CHANNEL.subscriber().unwrap();
-	loop {
-		let msg = listener.next_message_pure().await;
-
-		info!("[subscriber] Got a message: {:?}", msg);
-
-		// let valid_subs: Vec<_> = subscribers.iter().filter(|s| s.is_supported(msg.clone())).collect();
-
-		// join!(valid_subs.map(|s| s.push(msg.clone())));
-		for sub in &mut subscribers {
-			if sub.is_supported(msg.clone()) {
-				sub.push(msg.clone()).await;
-			}
-		}
 	}
 }

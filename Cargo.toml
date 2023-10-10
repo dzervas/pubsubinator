@@ -33,7 +33,8 @@ usbd-hid = "0.6.1"
 embedded-alloc = "0.5.0"
 usb-device = { version = "0.2.9", features = ["defmt"] }
 
-nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
+# nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
+nrf-softdevice = { path = "../nrf-softdevice/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 
 reactor = { version = "0.1.0", path = "reactor" }

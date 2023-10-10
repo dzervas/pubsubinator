@@ -1045,7 +1045,6 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 [[package]]
 name = "nrf-softdevice"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/nrf-softdevice#3b08bda268d343e100932cbf0df7e007826fa3be"
 dependencies = [
  "cortex-m",
  "cortex-m-rt",
@@ -1067,7 +1066,6 @@ dependencies = [
 [[package]]
 name = "nrf-softdevice-macro"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/nrf-softdevice#3b08bda268d343e100932cbf0df7e007826fa3be"
 dependencies = [
  "Inflector",
  "darling 0.13.4",
@@ -1080,7 +1078,6 @@ dependencies = [
 [[package]]
 name = "nrf-softdevice-s140"
 version = "0.1.1"
-source = "git+https://github.com/embassy-rs/nrf-softdevice#3b08bda268d343e100932cbf0df7e007826fa3be"
 
 [[package]]
 name = "nrf52805-pac"
