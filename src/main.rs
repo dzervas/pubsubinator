@@ -10,6 +10,7 @@ extern crate defmt_rtt;
 extern crate panic_probe;
 extern crate embassy_nrf;
 
+use core::mem;
 use core::mem::size_of;
 
 use defmt::*;
@@ -137,6 +138,11 @@ async fn main(spawner: Spawner) {
 	// -- Setup Keymap middleware --
 	let keymap = make_static!(keymap_mid::Keymap::new(
 		[[
+			[Key(KeyCode::Kb1), Key(KeyCode::Kb2), Key(KeyCode::Kb3)],
+			[Key(KeyCode::Kb4), Key(KeyCode::Kb5), Key(KeyCode::Kb6)],
+			[Key(KeyCode::Kb7), Key(KeyCode::Kb8), Key(KeyCode::Kb9)],
+		],
+		[
 			[Key(KeyCode::Intl1), Key(KeyCode::Intl2), Key(KeyCode::Intl3)],
 			[Key(KeyCode::Intl4), Key(KeyCode::Intl5), Key(KeyCode::Intl6)],
 			[Key(KeyCode::Intl7), Key(KeyCode::Intl8), Key(KeyCode::Intl9)],
@@ -178,7 +184,7 @@ async fn main(spawner: Spawner) {
 			conn_count: 6,
 			event_length: 24,
 		}),
-		conn_gatt: Some(raw::ble_gatt_conn_cfg_t { att_mtu: 256 }),
+		conn_gatt: Some(raw::ble_gatt_conn_cfg_t { att_mtu: 256 }), // Got from a trace! that said that peer wants 517
 		gatts_attr_tab_size: Some(raw::ble_gatts_cfg_attr_tab_size_t { attr_tab_size: 32768 }),
 		gap_role_count: Some(raw::ble_gap_cfg_role_count_t {
 			adv_set_count: 1,
@@ -191,9 +197,11 @@ async fn main(spawner: Spawner) {
 			p_value: b"PubSubinator" as *const u8 as _,
 			current_len: 12,
 			max_len: 12,
-			write_perm: raw::ble_gap_conn_sec_mode_t {
-				_bitfield_1: raw::ble_gap_conn_sec_mode_t::new_bitfield_1(1, 4),
-			},
+			write_perm: unsafe { mem::zeroed() },
+			// TODO: Use the SecurityMode enum
+			// write_perm: raw::ble_gap_conn_sec_mode_t {
+			// 	_bitfield_1: raw::ble_gap_conn_sec_mode_t::new_bitfield_1(1, 4),
+			// },
 			_bitfield_1: raw::ble_gap_cfg_device_name_t::new_bitfield_1(raw::BLE_GATTS_VLOC_STACK as u8),
 		}),
 		..Default::default()

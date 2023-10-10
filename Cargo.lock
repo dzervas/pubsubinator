@@ -887,6 +887,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db04bc24a18b9ea980628ecf00e6c0264f3c1426dac36c00cb49b6fbad8b0743"
 dependencies = [
  "atomic-polyfill 0.1.11",
+ "defmt",
  "hash32",
  "rustc_version 0.4.0",
  "spin 0.9.8",
@@ -1415,6 +1416,7 @@ dependencies = [
  "embedded-hal-bus",
  "fixed",
  "futures",
+ "heapless",
  "lazy_static",
  "nrf-softdevice",
  "panic-probe",
