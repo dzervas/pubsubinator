@@ -39,7 +39,7 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 
 reactor = { version = "0.1.0", path = "reactor" }
 reactor-macros = { version = "0.1.0", path = "reactor-macros" }
-heapless = { version = "0.7.16", features = ["defmt", "defmt-impl"] }
+heapless = { version = "0.8.0", features = ["defmt", "defmt-impl"] }
 
 [features]
 default = [
