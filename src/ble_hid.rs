@@ -5,11 +5,13 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Subscriber;
+use embassy_time::{Timer, Duration};
 use futures::Future;
+use futures::join;
 use heapless::String;
-use nrf_softdevice::ble::gatt_server::GetValueError;
+use nrf_softdevice::ble::gatt_server::{GetValueError, NotifyValueError};
 use nrf_softdevice::ble::security::SecurityHandler;
-use nrf_softdevice::ble::{gatt_server, peripheral, MasterId, EncryptionInfo, IdentityKey, GattValue};
+use nrf_softdevice::ble::{gatt_server, peripheral, MasterId, EncryptionInfo, IdentityKey, GattValue, Connection};
 use nrf_softdevice::{raw, Softdevice};
 use usbd_hid::descriptor::KeyboardReport;
 
@@ -110,12 +112,12 @@ pub struct KeyboardService {
 	#[characteristic(uuid = "2a4a", read)]
 	hid_information: [u8; 4], // Typically, the HID Information is 4 bytes, but it can vary.
 
-	#[characteristic(uuid = "2a4c", write_without_response)]
+	#[characteristic(uuid = "2a4c", write, write_without_response)]
 	hid_control_point: u8, // HID Control Point, used for control commands like "suspend" or "exit suspend".
 
 	// Boot Keyboard Input Report
 	// #[characteristic(uuid = "2a22", read, notify, getter="input_getter")]
-	#[characteristic(uuid = "2a22", read, notify)]
+	#[characteristic(uuid = "2a22", read, write, notify)]
 	boot_input: [u8; 8], // This size can vary based on your needs.
 
 	// Boot Keyboard Output Report (LED states like Caps Lock)
@@ -125,13 +127,13 @@ pub struct KeyboardService {
 	// HID Report Map (describes the format of the HID reports)
 	#[characteristic(uuid = "2a4b", read)]
 	// report_map: [u8; 47], // This will be an array that describes the report format.
-	report_map: [u8; 63], // This will be an array that describes the report format.
+	report_map: [u8; 76], // This will be an array that describes the report format.
 
-	#[characteristic(uuid = "2a4d", read, write, notify, getter="input_getter")]
-	// #[characteristic(uuid = "2a4d", read, write, notify)]
+	// #[characteristic(uuid = "2a4d", read, write, notify, getter="input_getter", notifier="input_notifier")]
+	#[characteristic(uuid = "2a4d", read, notify, indicate)]
 	report: [u8; 8], // This is the actual report data.
 
-	#[characteristic(uuid = "2a4e", read, write_without_response)]
+	#[characteristic(uuid = "2a4e", read, write, write_without_response)]
 	protocol_mode: u8, // Protocol Mode (boot/report mode)
 }
 
@@ -139,6 +141,11 @@ impl KeyboardService {
 	pub fn input_getter(&self, _sd: &Softdevice, _value_handle: u16) -> Result<[u8; 8], GetValueError> {
 		info!("---> input_getter!!");
 		Ok([0, 0, 4, 5, 6, 7, 8, 9])
+	}
+
+	pub fn input_notifier(&self, _conn: &Connection, _value_handle: u16, val: &[u8; 8]) -> Result<(), NotifyValueError> {
+		info!("---> input_notifier!! {:?}", val);
+		Ok(())
 	}
 }
 
@@ -176,7 +183,7 @@ pub struct BleHid<'a> {
 }
 
 impl<'a> BleHid<'a> {
-	pub async fn run(&mut self) {
+    pub async fn run(&mut self) {
 		#[rustfmt::skip]
 		let adv_data = &[
 			0x02, 0x01, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
@@ -208,7 +215,7 @@ impl<'a> BleHid<'a> {
 		self.server.keyboard.hid_information_set(&[
 			0x11, 0x01, // bcdHID (USB HID version)
 			0x00, // bCountryCode
-			0x02, // Flags
+			0x01, // Flags
 				  // Bit 0: Indicates if the device is capable of sending a wake signal to a host. If it can, this bit is set to 1, otherwise 0.
 				  // Bit 1: Indicates if the device is in Normally Connectable mode (0) or not (1).
 				  // Bit 2: This flag indicates if the device supports Boot Protocol Mode. For a Boot Keyboard, this bit should be set to 1.
@@ -219,40 +226,47 @@ impl<'a> BleHid<'a> {
 			0x05, 0x01, // Usage Page (Generic Desktop)
 			0x09, 0x06, // Usage (Keyboard)
 			0xa1, 0x01, // Collection (Application)
-			0x85, 0x01, // Report ID (1)
-			0x05, 0x07, // Usage Page (Keyboard)
-			0x19, 0xe0, // Usage Minimum (Keyboard LeftControl)
-			0x29, 0xe7, // Usage Maximum (Keyboard Right GUI)
-			0x15, 0x00, // Logical Minimum (0)
-			0x25, 0x01, // Logical Maximum (1)
-			0x95, 0x08, // Report Count (8)
-			0x75, 0x01, // Report Size (1)
-			0x81, 0x02, // Input (Data, Variable, Absolute) Modifier byte
-			0x95, 0x01, // Report Count (1)
-			0x75, 0x08, // Report Size (8)
-			0x81, 0x01, // Input (Constant, Array, Absolute) Reserved byte
-			0x95, 0x06, // Report Count (6)
-			0x75, 0x08, // Report Size (8)
-			0x15, 0x00, // Logical Minimum (0)
-			0x25, 0x65, // Logical Maximum (101)
-			0x19, 0x00, // Usage Minimum (0)
-			0x29, 0x65, // Usage Maximum (101)
-			0x81, 0x01, // Input (Data, Array, Absolute) Reserved byte
-			0x95, 0x05, // Report Count (5) - Num lock, Caps lock, Scroll lock, Compose, Kana
-			0x75, 0x01, // Report Size (1)
-			0x05, 0x08, // Usage Page (LEDs)
-			0x19, 0x01, // Usage Minimum (Num Lock)
-			0x29, 0x05, // Usage Maximum (Kana)
-			0x91, 0x01, // Output (Data, Variable, Absolute) LED report
-			0x95, 0x01, // Report Count (1)
-			0x75, 0x03, // Report Size (3)
-			0x91, 0x01, // Output (Data, Variable, Absolute) LED report padding
-			// 0x05, 0x07, // Usage Page (Key Codes)
-			// 0x05, 0x01, // Usage Minimum (Reserved (no event indicated))
-			// 0x05, 0x01, // Usage Maximum (Keyboard Application)
-			// 0x05, 0x01, // Input (Data,Array) Key arrays (6 bytes)
+			0x85, 0x01, //   Report ID (1)
+			0x05, 0x07, //   Usage Page (Keyboard)
+			0x19, 0xe0, //   Usage Minimum (Keyboard LeftControl)
+			0x29, 0xe7, //   Usage Maximum (Keyboard Right GUI)
+			0x15, 0x00, //   Logical Minimum (0)
+			0x25, 0x01, //   Logical Maximum (1)
+			0x75, 0x01, //   Report Size (1)
+			0x95, 0x08, //   Report Count (8)
+			0x81, 0x02, //   Input (Data, Variable, Absolute) Modifier byte
+
+			0x95, 0x01, //   Report Count (1)
+			0x75, 0x08, //   Report Size (8)
+			0x81, 0x01, //   Input (Constant) Reserved byte
+
+			0x95, 0x05, //   Report Count (5) - Num lock, Caps lock, Scroll lock, Compose, Kana
+			0x75, 0x01, //   Report Size (1)
+			0x05, 0x08, //   Usage Page (LEDs)
+			0x19, 0x01, //   Usage Minimum (Num Lock)
+			0x29, 0x05, //   Usage Maximum (Kana)
+			0x91, 0x02, //   Output (Data, Variable, Absolute) LED report
+
+			0x95, 0x01, //   Report Count (1)
+			0x75, 0x03, //   Report Size (3)
+			0x91, 0x01, //   Output (Data, Variable, Absolute) LED report padding
+
+			0x95, 0x06, //   Report Count (6)
+			0x75, 0x08, //   Report Size (8)
+			0x15, 0x00, //   Logical Minimum (0)
+			0x25, 0x65, //   Logical Maximum (101)
+			0x19, 0x00, //   Usage Minimum (0)
+			0x29, 0x65, //   Usage Maximum (101)
+			0x81, 0x00, //   Input (Data, Array) Key Array (6 bytes)
+
+			0x09, 0x05,       //   Usage (Vendor Defined)
+			0x15, 0x00,       //   Logical Minimum (0)
+			0x26, 0xFF, 0x00, //   Logical Maximum (255)
+			0x75, 0x08,       //   Report Count (2)
+			0x95, 0x02,       //   Report Size (8 bit)
+			0xB1, 0x02,       //   Feature (Data, Variable, Absolute)
+
 			0xc0, // End Collection
-			// 0x00, 0x00, 0x00
 		]).unwrap();
 
 		self.server.keyboard.protocol_mode_set(&0x01).unwrap();
@@ -266,13 +280,35 @@ impl<'a> BleHid<'a> {
 			// let conn = peripheral::advertise_connectable(self.softdevice, adv, &config).await.unwrap();
 			let conn = peripheral::advertise_pairable(self.softdevice, adv, &config, self.security_handler).await.unwrap();
 
+			let dumb_loop = || async {
+				let mut flag = false;
+				loop {
+					Timer::after(Duration::from_millis(1000)).await;
+					if flag {
+						info!("Sending empty report");
+						self.server.keyboard.report_set(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
+						// self.server.keyboard.report_notify(&conn, &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
+						self.server.keyboard.boot_input_set(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
+					} else {
+						info!("Sending button report");
+						self.server.keyboard.report_set(&[0x00, 0x00, 0x07, 0x08, 0x09, 0x00, 0x00, 0x00]).unwrap();
+						self.server.keyboard.boot_input_set(&[0x00, 0x00, 0x07, 0x08, 0x09, 0x00, 0x00, 0x00]).unwrap();
+						// self.server.keyboard.report_notify(&conn, &[0x00, 0x00, 0x04, 0x05, 0x06, 0x00, 0x00, 0x00]).unwrap();
+						// self.server.keyboard.report_indicate(&conn, &[0x00, 0x00, 0x04, 0x05, 0x06, 0x00, 0x00, 0x00]).unwrap();
+					}
+
+					flag = !flag;
+				}
+			};
+
 			info!("advertising done!");
 
 			// Run the GATT server on the connection. This returns when the connection gets disconnected.
 			//
 			// Event enums (ServerEvent's) are generated by nrf_softdevice::gatt_server
 			// proc macro when applied to the Server struct above
-			let e = gatt_server::run(&conn, &self.server, |e| match e {
+			// let e = gatt_server::run(&conn, &self.server, |e| match e {
+			join!(gatt_server::run(&conn, &self.server, |e| match e {
 				ServerEvent::Bas(e) => match e {
 					BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
 						info!("battery notifications: {}", notifications)
@@ -282,30 +318,39 @@ impl<'a> BleHid<'a> {
 					KeyboardServiceEvent::HidControlPointWrite(d) => {
 						info!("HID control point: {:?}", d)
 					},
-					KeyboardServiceEvent::BootInputCccdWrite { notifications } => {
-						info!("boot input notifications: {}", notifications)
-					},
-					KeyboardServiceEvent::BootOutputWrite(d) => {
-						info!("boot output: {:?}", d)
-					},
+					// KeyboardServiceEvent::BootInputCccdWrite { notifications } => {
+					// 	info!("boot input notifications: {}", notifications)
+					// },
+					// KeyboardServiceEvent::BootOutputWrite(d) => {
+					// 	info!("boot output: {:?}", d)
+					// },
 					KeyboardServiceEvent::ProtocolModeWrite(d) => {
 						info!("protocol mode: {:?}", d);
-						self.server.keyboard.protocol_mode_set(&0x00).unwrap();
+						// self.server.keyboard.protocol_mode_set(&0x00).unwrap();
 					},
-					KeyboardServiceEvent::ReportWrite(d) => {
-						info!("report: {:?}", d);
+					KeyboardServiceEvent::BootInputWrite(d) => {
+						info!("boot input: {:?}", d);
 					},
-					KeyboardServiceEvent::ReportCccdWrite { notifications } => {
+					// KeyboardServiceEvent::ReportWrite(d) => {
+					// 	info!("report: {:?}", d);
+					// },
+					KeyboardServiceEvent::BootInputCccdWrite { notifications } => {
 						info!("report notifications: {}", notifications)
+					},
+					KeyboardServiceEvent::ReportCccdWrite { notifications, indications } => {
+						info!("report notifications: {} - {}", notifications, indications)
+					},
+					KeyboardServiceEvent::BootOutputWrite(d) => {
+						info!("boot output: {:?}", d);
 					},
 				},
 				ServerEvent::DeviceInformation(e) => match e {
 
 				}
-			})
-			.await;
+			}), dumb_loop());
+			// .await;
 
-			info!("gatt_server run exited with error: {:?}", e);
+			// info!("gatt_server run exited with error: {:?}", e);
 		}
 	}
 }

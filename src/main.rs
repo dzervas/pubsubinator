@@ -237,8 +237,8 @@ async fn main(spawner: Spawner) {
 	spawner.spawn(softdevice_task(sd)).unwrap();
 	info!("SoftDevice initialized");
 
-	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid, keymap]);
-	spawner.spawn(subs_task).unwrap();
+	// let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid, keymap]);
+	// spawner.spawn(subs_task).unwrap();
 }
 
 #[task]
