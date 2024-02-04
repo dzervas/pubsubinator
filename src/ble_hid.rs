@@ -2,11 +2,13 @@ use core::cell::{Cell, RefCell};
 use core::pin::Pin;
 
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMutex};
+use embassy_sync::mutex::Mutex;
 use embassy_sync::pubsub::Subscriber;
 use futures::Future;
-use futures::join;
+// use heapless::pool::arc::Arc;
 use heapless::String;
 use nrf_softdevice::ble::advertisement_builder::{AdvertisementDataType, Flag, LegacyAdvertisementBuilder, ServiceList, ServiceUuid16};
 use nrf_softdevice::ble::gatt_server::builder::ServiceBuilder;
@@ -212,14 +214,14 @@ pub struct DeviceInformationService {
 }
 
 pub struct HIDService {
-	hid_info: u16,
-	report_map: u16,
-	hid_control: u16,
-	protocol_mode: u16,
-	input_keyboard: u16,
-	output_keyboard: u16,
-	input_media_keys: u16,
-	active_conn_handle: Option<u16>,
+	pub hid_info: u16,
+	pub report_map: u16,
+	pub hid_control: u16,
+	pub protocol_mode: u16,
+	pub input_keyboard: u16,
+	pub output_keyboard: u16,
+	pub input_media_keys: u16,
+	pub active_conn_handle: Arc<Mutex<ThreadModeRawMutex, Option<u16>>>,
 }
 
 impl HIDService {
@@ -281,11 +283,11 @@ impl HIDService {
 			input_keyboard: input_keyboard_handle.value_handle,
 			output_keyboard: output_keyboard_handle.value_handle,
 			input_media_keys: input_media_keys_handle.value_handle,
-			active_conn_handle: None,
+			active_conn_handle: Arc::new(Mutex::new(None)),
 		})
 	}
 
-	pub fn send_report(&self, conn: &Connection, report: &KeyboardReport) {
+	pub async fn send_report(&self, report: &KeyboardReport) {
 		let report_bytes = [
 			report.modifier,
 			0,
@@ -296,7 +298,17 @@ impl HIDService {
 			report.keycodes[4],
 			report.keycodes[5],
 		];
-		gatt_server::notify_value(conn, self.input_keyboard, &report_bytes).unwrap();
+		let active_conn = *self.active_conn_handle.lock().await;
+		if active_conn.is_none() {
+			info!("No active connection");
+			return;
+		}
+		let conn = Connection::from_handle(active_conn.unwrap()).unwrap();
+
+		match gatt_server::notify_value(&conn, self.input_keyboard, &report_bytes) {
+			Ok(_) => {},
+			Err(e) => warn!("Error sending BLE HID report: {:?}", e),
+		}
 	}
 }
 type HIDServiceEvent = ();
@@ -306,49 +318,65 @@ impl Service for HIDService {
 	fn on_write(&self, handle: u16, data: &[u8]) -> Option<Self::Event> {
 		info!("HIDService::on_write: handle: {:x}, data: {:?}", handle, data);
 
-		if handle == self.output_keyboard && self.active_conn_handle.is_some() {
-			let conn = Connection::from_handle(self.active_conn_handle.unwrap()).unwrap();
-			if data.len() > 0 {
-				let report = if data[0] == 0x01 {
-					KeyboardReport {
-						modifier: 0,
-						reserved: 0,
-						leds: 0,
-						keycodes: [0x0A, 0, 0, 0, 0, 0],
-					}
-				} else {
-					KeyboardReport {
-						modifier: 0,
-						reserved: 0,
-						leds: 0,
-						keycodes: [0; 6],
-					}
-				};
+		// if handle == self.output_keyboard && self.active_conn_handle.lock().await.is_some() {
+		// 	let conn = Connection::from_handle(self.active_conn_handle.unwrap()).unwrap();
+		// 	if data.len() > 0 {
+		// 		let report = if data[0] == 0x01 {
+		// 			KeyboardReport {
+		// 				modifier: 0,
+		// 				reserved: 0,
+		// 				leds: 0,
+		// 				keycodes: [0x0A, 0, 0, 0, 0, 0],
+		// 			}
+		// 		} else {
+		// 			KeyboardReport {
+		// 				modifier: 0,
+		// 				reserved: 0,
+		// 				leds: 0,
+		// 				keycodes: [0; 6],
+		// 			}
+		// 		};
 
-				self.send_report(&conn, &report);
-			}
-		}
+		// 		self.send_report(&conn, &report);
+		// 	}
+		// }
 		None
 	}
 }
 
 #[nrf_softdevice::gatt_server]
 pub struct Server {
-	bas: BatteryService,
-	hid: HIDService,
-	dis: DeviceInformationService,
+	pub bas: BatteryService,
+	pub hid: HIDService,
+	pub dis: DeviceInformationService,
+}
+
+impl Server {
+	pub fn init(&mut self) {
+		self.dis.model_number_set(&String::try_from("Launchpad").unwrap()).unwrap();
+		self.dis.serial_number_set(&String::try_from("123456").unwrap()).unwrap();
+		self.dis.manufacturer_name_set(&String::try_from("PubSubinator").unwrap()).unwrap();
+		self.dis.pnp_id_set(&PnPID {
+			vid_source: VidSource::UsbIF,
+			vendor_id: 0x05AC,
+			product_id: 0x820A,
+			product_version: 0x0100,
+		}).unwrap();
+
+		self.bas.battery_level_set(&66).unwrap();
+	}
 }
 
 pub struct BleHid<'a> {
 	pub softdevice: &'a Softdevice,
-	pub server: Server,
+	pub server: &'a Server,
 	pub report: KeyboardReport,
 	pub channel: Subscriber<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 	pub security_handler: &'static Bonder,
 }
 
 impl<'a> BleHid<'a> {
-	pub async fn run(&mut self) {
+	pub async fn connect(sd: &'a Softdevice, security_handler: &'static dyn SecurityHandler) -> Connection {
 		let adv_data = LegacyAdvertisementBuilder::new()
 			.flags(&[Flag::GeneralDiscovery, Flag::LE_Only])
 			.services_16(ServiceList::Incomplete, &[ServiceUuid16::BATTERY, ServiceUuid16::HUMAN_INTERFACE_DEVICE])
@@ -360,48 +388,29 @@ impl<'a> BleHid<'a> {
 			.services_16(ServiceList::Complete, &[ServiceUuid16::BATTERY, ServiceUuid16::DEVICE_INFORMATION, ServiceUuid16::HUMAN_INTERFACE_DEVICE])
 			.build();
 
-		self.server.dis.model_number_set(&String::try_from("Launchpad").unwrap()).unwrap();
-		self.server.dis.serial_number_set(&String::try_from("123456").unwrap()).unwrap();
-		self.server.dis.manufacturer_name_set(&String::try_from("PubSubinator").unwrap()).unwrap();
-		self.server.dis.pnp_id_set(&PnPID {
-			vid_source: VidSource::UsbIF,
-			vendor_id: 0x05AC,
-			product_id: 0x820A,
-			product_version: 0x0100,
-		}).unwrap();
+		let config = peripheral::Config::default();
+		let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
+			adv_data: &adv_data,
+			scan_data: &scan_data
+		};
 
-		self.server.bas.battery_level_set(&66).unwrap();
+		info!("advertising...");
 
-		loop {
-			let config = peripheral::Config::default();
-			let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
-				adv_data: &adv_data,
-				scan_data: &scan_data
-			};
+		let conn = peripheral::advertise_pairable(sd, adv, &config, security_handler).await.unwrap();
+		info!("Updating active connection handle");
 
-			// let conn = peripheral::advertise_connectable(self.softdevice, adv, &config).await.unwrap();
-			let conn = peripheral::advertise_pairable(self.softdevice, adv, &config, self.security_handler).await.unwrap();
-			self.server.hid.active_conn_handle = conn.handle();
+		info!("advertising done!");
 
-			info!("advertising done!");
-
-			// Run the GATT server on the connection. This returns when the connection gets disconnected.
-			//
-			// Event enums (ServerEvent's) are generated by nrf_softdevice::gatt_server
-			// proc macro when applied to the Server struct above
-			gatt_server::run(&conn, &self.server, |e| match e {
-				ServerEvent::Bas(e) => match e {
-					BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
-						info!("battery notifications: {}", notifications)
-					}
-				},
-				ServerEvent::Hid(e) => {
-					info!("HID event: {:?}", e)
-				},
-				ServerEvent::Dis(_e) => {}
-			}).await;
-		}
+		conn
 	}
+
+	// pub async fn run(&self, conn: &Connection) {
+		// Run the GATT server on the connection. This returns when the connection gets disconnected.
+		//
+		// Event enums (ServerEvent's) are generated by nrf_softdevice::gatt_server
+		// proc macro when applied to the Server struct above
+		// gatt_server::run(conn, &self.server, |_| {}).await;
+	// }
 }
 
 impl<'a> RSubscriber for BleHid<'a> {
@@ -445,7 +454,8 @@ impl<'a> RSubscriber for BleHid<'a> {
 					return;
 				},
 			}
-			// self.server.hid.send_report(self.conn.as_ref().unwrap(), &self.report);
+
+			self.server.hid.send_report(&self.report).await;
 		})
 	}
 }
@@ -471,82 +481,84 @@ impl Default for Bonder {
 	}
 }
 
-impl SecurityHandler for Bonder {
-	fn io_capabilities(&self) -> nrf_softdevice::ble::security::IoCapabilities {
-		nrf_softdevice::ble::security::IoCapabilities::DisplayOnly
-	}
+impl SecurityHandler for Bonder {}
 
-	// fn can_recv_out_of_band(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
-	// 	true
-	// }
+// impl SecurityHandler for Bonder {
+// 	fn io_capabilities(&self) -> nrf_softdevice::ble::security::IoCapabilities {
+// 		nrf_softdevice::ble::security::IoCapabilities::DisplayOnly
+// 	}
 
-	fn can_bond(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
-		true
-	}
+// 	// fn can_recv_out_of_band(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
+// 	// 	true
+// 	// }
 
-	fn display_passkey(&self, passkey: &[u8; 6]) {
-		info!("display_passkey {:?}", passkey);
-	}
+// 	fn can_bond(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
+// 		true
+// 	}
 
-	// fn enter_passkey(&self, _reply: nrf_softdevice::ble::PasskeyReply) {
-	// 	info!("enter_passkey");
-	// }
+// 	fn display_passkey(&self, passkey: &[u8; 6]) {
+// 		info!("display_passkey {:?}", passkey);
+// 	}
 
-	// fn recv_out_of_band(&self, _reply: nrf_softdevice::ble::OutOfBandReply) {
-	// 	info!("recv_out_of_band");
-	// }
+// 	// fn enter_passkey(&self, _reply: nrf_softdevice::ble::PasskeyReply) {
+// 	// 	info!("enter_passkey");
+// 	// }
 
-	fn on_security_update(&self, _conn: &nrf_softdevice::ble::Connection, security_mode: nrf_softdevice::ble::SecurityMode) {
-		info!("on_security_update {:?}", security_mode);
-	}
+// 	// fn recv_out_of_band(&self, _reply: nrf_softdevice::ble::OutOfBandReply) {
+// 	// 	info!("recv_out_of_band");
+// 	// }
 
-	fn on_bonded(&self, _conn: &nrf_softdevice::ble::Connection, master_id: nrf_softdevice::ble::MasterId, key: nrf_softdevice::ble::EncryptionInfo, peer_id: nrf_softdevice::ble::IdentityKey) {
-		info!("on_bonded");
+// 	fn on_security_update(&self, _conn: &nrf_softdevice::ble::Connection, security_mode: nrf_softdevice::ble::SecurityMode) {
+// 		info!("on_security_update {:?}", security_mode);
+// 	}
 
-		// In a real application you would want to signal another task to permanently store the keys in non-volatile memory here.
-		self.sys_attrs.borrow_mut().clear();
-		self.peer.set(Some(Peer {
-			master_id,
-			key,
-			peer_id,
-		}));
-	}
+// 	fn on_bonded(&self, _conn: &nrf_softdevice::ble::Connection, master_id: nrf_softdevice::ble::MasterId, key: nrf_softdevice::ble::EncryptionInfo, peer_id: nrf_softdevice::ble::IdentityKey) {
+// 		info!("on_bonded");
 
-	fn get_key(&self, _conn: &nrf_softdevice::ble::Connection, master_id: MasterId) -> Option<EncryptionInfo> {
-		debug!("getting bond for: id: {}", master_id);
+// 		// In a real application you would want to signal another task to permanently store the keys in non-volatile memory here.
+// 		self.sys_attrs.borrow_mut().clear();
+// 		self.peer.set(Some(Peer {
+// 			master_id,
+// 			key,
+// 			peer_id,
+// 		}));
+// 	}
 
-		self.peer
-			.get()
-			.and_then(|peer| (master_id == peer.master_id).then_some(peer.key))
-	}
+// 	fn get_key(&self, _conn: &nrf_softdevice::ble::Connection, master_id: MasterId) -> Option<EncryptionInfo> {
+// 		debug!("getting bond for: id: {}", master_id);
 
-	fn save_sys_attrs(&self, conn: &nrf_softdevice::ble::Connection) {
-		debug!("saving system attributes for: {}", conn.peer_address());
+// 		self.peer
+// 			.get()
+// 			.and_then(|peer| (master_id == peer.master_id).then_some(peer.key))
+// 	}
 
-		if let Some(peer) = self.peer.get() {
-			if peer.peer_id.is_match(conn.peer_address()) {
-				let mut sys_attrs = self.sys_attrs.borrow_mut();
-				let capacity = sys_attrs.capacity();
-				sys_attrs.resize(capacity, 0);
-				let len = unwrap!(gatt_server::get_sys_attrs(conn, &mut sys_attrs)) as u16;
-				sys_attrs.truncate(usize::from(len));
-				// In a real application you would want to signal another task to permanently store sys_attrs for this connection's peer
-			}
-		}
-	}
+// 	fn save_sys_attrs(&self, conn: &nrf_softdevice::ble::Connection) {
+// 		debug!("saving system attributes for: {}", conn.peer_address());
 
-	fn load_sys_attrs(&self, conn: &nrf_softdevice::ble::Connection) {
-		let addr = conn.peer_address();
-		debug!("loading system attributes for: {}", addr);
+// 		if let Some(peer) = self.peer.get() {
+// 			if peer.peer_id.is_match(conn.peer_address()) {
+// 				let mut sys_attrs = self.sys_attrs.borrow_mut();
+// 				let capacity = sys_attrs.capacity();
+// 				sys_attrs.resize(capacity, 0);
+// 				let len = unwrap!(gatt_server::get_sys_attrs(conn, &mut sys_attrs)) as u16;
+// 				sys_attrs.truncate(usize::from(len));
+// 				// In a real application you would want to signal another task to permanently store sys_attrs for this connection's peer
+// 			}
+// 		}
+// 	}
 
-		let attrs = self.sys_attrs.borrow();
-		// In a real application you would search all stored peers to find a match
-		let attrs = if self.peer.get().map(|peer| peer.peer_id.is_match(addr)).unwrap_or(false) {
-			(!attrs.is_empty()).then_some(attrs.as_slice())
-		} else {
-			None
-		};
+// 	fn load_sys_attrs(&self, conn: &nrf_softdevice::ble::Connection) {
+// 		let addr = conn.peer_address();
+// 		debug!("loading system attributes for: {}", addr);
 
-		gatt_server::set_sys_attrs(conn, attrs).unwrap();
-	}
-}
+// 		let attrs = self.sys_attrs.borrow();
+// 		// In a real application you would search all stored peers to find a match
+// 		let attrs = if self.peer.get().map(|peer| peer.peer_id.is_match(addr)).unwrap_or(false) {
+// 			(!attrs.is_empty()).then_some(attrs.as_slice())
+// 		} else {
+// 			None
+// 		};
+
+// 		gatt_server::set_sys_attrs(conn, attrs).unwrap();
+// 	}
+// }
