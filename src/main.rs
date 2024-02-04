@@ -23,21 +23,16 @@ extern crate embassy_nrf;
 use core::mem;
 use core::mem::size_of;
 
-use ble_hid::Server;
 use defmt::*;
 use embassy_nrf::gpio::{Input, Pin, Pull, Output, Level, AnyPin};
 
 use embassy_executor::{task, Spawner};
-use embassy_nrf::pac::ficr::info;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::PubSubChannel;
 use embassy_time::Duration;
 use embassy_time::Ticker;
 use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
-use nrf_softdevice::ble::gatt_server;
-use nrf_softdevice::ble::security;
-use nrf_softdevice::ble::Connection;
 use reactor::Polled;
 use reactor::reactor_event::{KeyCode, ReactorEvent};
 use reactor::reactor_event::KeyCodeInt::Key;
@@ -68,6 +63,7 @@ pub mod keymap_mid;
 
 #[allow(unused_imports)]
 use crate::analog_nrf::Analog;
+use crate::ble_hid::ble_hid_task;
 use crate::keymap_mid::KEYMAP_PERIOD;
 use crate::matrix::Matrix;
 use crate::nrf::usb_init;
@@ -103,25 +99,6 @@ async fn softdevice_task(sd: &'static Softdevice) {
 		};
 	}).await;
 	info!("SoftDevice task finished");
-}
-
-#[task]
-async fn ble_hid_task(sd: &'static Softdevice, server: &'static Server) {
-	info!("BLE HID task started");
-	let security_handler = make_static!(ble_hid::Bonder::default());
-
-	loop {
-		info!("Waiting for connection");
-		let conn = BleHid::connect(sd, security_handler).await;
-
-		let mut active_conn = server.hid.active_conn_handle.lock().await;
-		*active_conn = conn.handle();
-		drop(active_conn);
-
-		gatt_server::run(&conn, server, |_| {}).await;
-
-		info!("Connection lost");
-	}
 }
 
 #[embassy_executor::main]
@@ -183,11 +160,11 @@ async fn main(spawner: Spawner) {
 	// spawner.spawn(poller_task(analog)).unwrap();
 
 	// -- Setup USB HID consumer --
-	// let mut usb_builder = usb_init(p.USBD);
-	// let usb_hid = make_static!(UsbHid::new(&mut usb_builder));
+	let mut usb_builder = usb_init(p.USBD);
+	let usb_hid = make_static!(UsbHid::new(&mut usb_builder));
 
-	// spawner.spawn(usb_task(usb_builder)).unwrap();
-	// info!("USB HID consumer initialized");
+	spawner.spawn(usb_task(usb_builder)).unwrap();
+	info!("USB HID consumer initialized");
 
 	// -- Setup SoftDevice --
 	info!("Starting SoftDevice BLE shit");
@@ -253,7 +230,7 @@ async fn main(spawner: Spawner) {
 
 	spawner.spawn(ble_hid_task(sd, server)).unwrap();
 
-	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [ble_hid, keymap]);
+	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [ble_hid, usb_hid, keymap]);
 	spawner.spawn(subs_task).unwrap();
 }
 

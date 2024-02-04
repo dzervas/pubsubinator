@@ -1,7 +1,9 @@
+use core::ops::Deref;
 use core::pin::Pin;
 
 use alloc::boxed::Box;
-use defmt::info;
+use defmt::{debug, info, warn};
+use embassy_nrf::usb::vbus_detect::VbusDetect;
 use embassy_usb::Builder;
 use embassy_usb::control::OutResponse;
 use embassy_usb::class::hid::{HidWriter, ReportId, RequestHandler, State};
@@ -13,6 +15,7 @@ use usbd_hid::descriptor::SerializedDescriptor;
 use reactor::RSubscriber;
 use reactor::reactor_event::*;
 use crate::nrf::UsbDriver;
+use crate::VBUS_DETECT;
 
 pub struct UsbHid {
 	writer: Option<HidWriter<'static, UsbDriver, 8>>,
@@ -55,16 +58,18 @@ impl RSubscriber for UsbHid {
 			// ReactorEvent::Locks { caps, num, scroll } => true,
 			// ReactorEvent::Mouse { x, y } => true,
 			_ => false,
-		}) && self.writer.is_some()
+		}) && self.writer.is_some() && VBUS_DETECT.deref().is_usb_detected()
 	}
 
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
-		if self.writer.is_none() {
-			info!("USB HID writer is not ready");
+		if self.writer.is_none() || !VBUS_DETECT.deref().is_usb_detected() {
+			debug!("USB HID writer is none or USB is not detected, skipping event.");
 			return Box::pin(async {
 				()
 			});
 		}
+
+		info!("VBUS status: {:?}", VBUS_DETECT.deref().is_usb_detected());
 
 		Box::pin(async move {
 			match value {
@@ -106,8 +111,11 @@ impl RSubscriber for UsbHid {
 				},
 			}
 
-			self.writer.as_mut().unwrap().ready().await;
-			// self.writer.as_mut().unwrap().write_serialize(&self.report).await.unwrap();
+			// self.writer.as_mut().unwrap().ready().await;
+			match self.writer.as_mut().unwrap().write_serialize(&self.report).await {
+				Ok(_) => {},
+				Err(e) => warn!("Error writing to USB HID: {:?}", e),
+			}
 		})
 	}
 }

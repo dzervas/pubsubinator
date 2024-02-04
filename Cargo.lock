@@ -624,7 +624,7 @@ dependencies = [
  "embassy-usb-driver",
  "heapless 0.8.0",
  "ssmarshal",
- "usbd-hid 0.6.1",
+ "usbd-hid",
 ]
 
 [[package]]
@@ -1080,6 +1080,8 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 [[package]]
 name = "nrf-softdevice"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "225a21d963b2382617dbbff5953dc8c6c43fe56db5c5155f4d20a30c50c2766d"
 dependencies = [
  "cortex-m",
  "cortex-m-rt",
@@ -1101,6 +1103,8 @@ dependencies = [
 [[package]]
 name = "nrf-softdevice-macro"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3af0752f2f12e202fa29f5a8d2f6dcc8a421c7a7e368d9dab7feb6bfe24ff0e9"
 dependencies = [
  "Inflector",
  "darling 0.13.4",
@@ -1113,6 +1117,8 @@ dependencies = [
 [[package]]
 name = "nrf-softdevice-s140"
 version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ea93a1e11efdafcf914ed6b81b5be0cd99ee8ff6c3060102265ea863a355393"
 
 [[package]]
 name = "nrf52805-pac"
@@ -1488,7 +1494,7 @@ dependencies = [
  "reactor-macros",
  "static_cell",
  "usb-device 0.3.1",
- "usbd-hid 0.7.0",
+ "usbd-hid",
 ]
 
 [[package]]
@@ -1908,18 +1914,6 @@ dependencies = [
  "serde",
  "ssmarshal",
  "usb-device 0.2.9",
- "usbd-hid-macros",
-]
-
-[[package]]
-name = "usbd-hid"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41a2d4546ca3e6a5c6a85584e5caf29feabf3ec35d6cd6b772eb35bd3cff7256"
-dependencies = [
- "serde",
- "ssmarshal",
- "usb-device 0.3.1",
  "usbd-hid-macros",
 ]
 

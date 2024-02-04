@@ -29,13 +29,12 @@ embedded-hal = { version = "1.0.0" }
 embedded-hal-async = { version = "1.0.0", optional = true }
 embedded-hal-bus = { version = "0.1.0" }
 
-usbd-hid = "0.7.0"
+usbd-hid = "0.6.1"
 embedded-alloc = "0.5.1"
 usb-device = { version = "0.3.1", features = ["defmt"] }
 
-# nrf-softdevice = { version = "0.1.0", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
+nrf-softdevice = { version = "0.1.0", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
 # nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
-nrf-softdevice = { path = "../nrf-softdevice/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-peripheral", "ble-gatt-server", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 
 reactor = { version = "0.1.0", path = "reactor" }

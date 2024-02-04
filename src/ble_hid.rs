@@ -4,6 +4,7 @@ use core::pin::Pin;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use embassy_executor::task;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMutex};
 use embassy_sync::mutex::Mutex;
 use embassy_sync::pubsub::Subscriber;
@@ -17,6 +18,7 @@ use nrf_softdevice::ble::gatt_server::{RegisterError, Service};
 use nrf_softdevice::ble::security::SecurityHandler;
 use nrf_softdevice::ble::{gatt_server, peripheral, Connection, EncryptionInfo, GattValue, IdentityKey, MasterId, Uuid};
 use nrf_softdevice::Softdevice;
+use static_cell::make_static;
 use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
@@ -125,6 +127,27 @@ pub const REPORT_MAP: &[u8] = hid!(
 	(HIDINPUT, 0x02),            // INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
 	(END_COLLECTION),            // END_COLLECTION
 );
+
+#[task]
+pub async fn ble_hid_task(sd: &'static Softdevice, server: &'static Server) {
+	info!("BLE HID task started");
+	let security_handler = make_static!(Bonder::default());
+
+	loop {
+		info!("Waiting for connection");
+		let conn = BleHid::connect(sd, security_handler).await;
+
+		info!("Got connection: {:?}", conn.peer_address());
+		let mut active_conn = server.hid.active_conn_handle.lock().await;
+		*active_conn = conn.handle();
+		drop(active_conn);
+		info!("Updated active connection handle");
+
+		gatt_server::run(&conn, server, |_| {}).await;
+
+		info!("Connection lost");
+	}
+}
 
 #[nrf_softdevice::gatt_service(uuid = "180f")]
 pub struct BatteryService {
@@ -298,13 +321,14 @@ impl HIDService {
 			report.keycodes[4],
 			report.keycodes[5],
 		];
-		let active_conn = *self.active_conn_handle.lock().await;
+		let active_conn = self.active_conn_handle.lock().await;
 		if active_conn.is_none() {
 			info!("No active connection");
 			return;
 		}
 
 		let conn = Connection::from_handle(active_conn.unwrap()).unwrap();
+		drop(active_conn);
 
 		match gatt_server::notify_value(&conn, self.input_keyboard, &report_bytes) {
 			Ok(_) => {},
@@ -461,7 +485,7 @@ impl Default for Bonder {
 
 impl SecurityHandler for Bonder {
 	fn io_capabilities(&self) -> nrf_softdevice::ble::security::IoCapabilities {
-		nrf_softdevice::ble::security::IoCapabilities::DisplayOnly
+		nrf_softdevice::ble::security::IoCapabilities::None
 	}
 
 	// fn can_recv_out_of_band(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
@@ -516,9 +540,10 @@ impl SecurityHandler for Bonder {
 				let mut sys_attrs = self.sys_attrs.borrow_mut();
 				let capacity = sys_attrs.capacity();
 				sys_attrs.resize(capacity, 0);
-				let len = unwrap!(gatt_server::get_sys_attrs(conn, &mut sys_attrs)) as u16;
-				sys_attrs.truncate(usize::from(len));
-				// In a real application you would want to signal another task to permanently store sys_attrs for this connection's peer
+				if let Ok(len) = gatt_server::get_sys_attrs(conn, &mut sys_attrs) {
+					sys_attrs.truncate(len);
+					// In a real application you would want to signal another task to permanently store sys_attrs for this connection's peer
+				}
 			}
 		}
 	}
