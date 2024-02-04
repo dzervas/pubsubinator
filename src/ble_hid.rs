@@ -250,21 +250,21 @@ impl HIDService {
 			Uuid::new_16(0x2A4D),
 			Attribute::new([0u8; 8]),
 			Metadata::new(Properties::new().read().notify()))?;
-		let input_keyboard_desc = input_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 1u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys), second is in/out
+		let _input_keyboard_desc = input_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 1u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys), second is in/out
 		let input_keyboard_handle = input_keyboard.build();
 
 		let mut output_keyboard = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4D),
 			Attribute::new([0u8; 8]),
 			Metadata::new(Properties::new().read().write().write_without_response()))?;
-		let output_keyboard_desc = output_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 2u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys)
+		let _output_keyboard_desc = output_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 2u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys)
 		let output_keyboard_handle = output_keyboard.build();
 
 		let mut input_media_keys = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4D),
 			Attribute::new([0u8; 16]),
 			Metadata::new(Properties::new().read().notify()))?;
-		let input_media_keys_desc = input_media_keys.add_descriptor(Uuid::new_16(0x2908), Attribute::new([MEDIA_KEYS_ID, 1u8]))?;
+		let _input_media_keys_desc = input_media_keys.add_descriptor(Uuid::new_16(0x2908), Attribute::new([MEDIA_KEYS_ID, 1u8]))?;
 		let input_media_keys_handle = input_media_keys.build();
 
 		let protocol_mode = service_builder.add_characteristic(
@@ -303,6 +303,7 @@ impl HIDService {
 			info!("No active connection");
 			return;
 		}
+
 		let conn = Connection::from_handle(active_conn.unwrap()).unwrap();
 
 		match gatt_server::notify_value(&conn, self.input_keyboard, &report_bytes) {
@@ -317,29 +318,6 @@ impl Service for HIDService {
 	type Event = HIDServiceEvent;
 	fn on_write(&self, handle: u16, data: &[u8]) -> Option<Self::Event> {
 		info!("HIDService::on_write: handle: {:x}, data: {:?}", handle, data);
-
-		// if handle == self.output_keyboard && self.active_conn_handle.lock().await.is_some() {
-		// 	let conn = Connection::from_handle(self.active_conn_handle.unwrap()).unwrap();
-		// 	if data.len() > 0 {
-		// 		let report = if data[0] == 0x01 {
-		// 			KeyboardReport {
-		// 				modifier: 0,
-		// 				reserved: 0,
-		// 				leds: 0,
-		// 				keycodes: [0x0A, 0, 0, 0, 0, 0],
-		// 			}
-		// 		} else {
-		// 			KeyboardReport {
-		// 				modifier: 0,
-		// 				reserved: 0,
-		// 				leds: 0,
-		// 				keycodes: [0; 6],
-		// 			}
-		// 		};
-
-		// 		self.send_report(&conn, &report);
-		// 	}
-		// }
 		None
 	}
 }
@@ -481,84 +459,82 @@ impl Default for Bonder {
 	}
 }
 
-impl SecurityHandler for Bonder {}
+impl SecurityHandler for Bonder {
+	fn io_capabilities(&self) -> nrf_softdevice::ble::security::IoCapabilities {
+		nrf_softdevice::ble::security::IoCapabilities::DisplayOnly
+	}
 
-// impl SecurityHandler for Bonder {
-// 	fn io_capabilities(&self) -> nrf_softdevice::ble::security::IoCapabilities {
-// 		nrf_softdevice::ble::security::IoCapabilities::DisplayOnly
-// 	}
+	// fn can_recv_out_of_band(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
+	// 	true
+	// }
 
-// 	// fn can_recv_out_of_band(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
-// 	// 	true
-// 	// }
+	fn can_bond(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
+		true
+	}
 
-// 	fn can_bond(&self, _conn: &nrf_softdevice::ble::Connection) -> bool {
-// 		true
-// 	}
+	fn display_passkey(&self, passkey: &[u8; 6]) {
+		info!("display_passkey {:?}", passkey);
+	}
 
-// 	fn display_passkey(&self, passkey: &[u8; 6]) {
-// 		info!("display_passkey {:?}", passkey);
-// 	}
+	// fn enter_passkey(&self, _reply: nrf_softdevice::ble::PasskeyReply) {
+	// 	info!("enter_passkey");
+	// }
 
-// 	// fn enter_passkey(&self, _reply: nrf_softdevice::ble::PasskeyReply) {
-// 	// 	info!("enter_passkey");
-// 	// }
+	// fn recv_out_of_band(&self, _reply: nrf_softdevice::ble::OutOfBandReply) {
+	// 	info!("recv_out_of_band");
+	// }
 
-// 	// fn recv_out_of_band(&self, _reply: nrf_softdevice::ble::OutOfBandReply) {
-// 	// 	info!("recv_out_of_band");
-// 	// }
+	fn on_security_update(&self, _conn: &nrf_softdevice::ble::Connection, security_mode: nrf_softdevice::ble::SecurityMode) {
+		info!("on_security_update {:?}", security_mode);
+	}
 
-// 	fn on_security_update(&self, _conn: &nrf_softdevice::ble::Connection, security_mode: nrf_softdevice::ble::SecurityMode) {
-// 		info!("on_security_update {:?}", security_mode);
-// 	}
+	fn on_bonded(&self, _conn: &nrf_softdevice::ble::Connection, master_id: nrf_softdevice::ble::MasterId, key: nrf_softdevice::ble::EncryptionInfo, peer_id: nrf_softdevice::ble::IdentityKey) {
+		info!("on_bonded");
 
-// 	fn on_bonded(&self, _conn: &nrf_softdevice::ble::Connection, master_id: nrf_softdevice::ble::MasterId, key: nrf_softdevice::ble::EncryptionInfo, peer_id: nrf_softdevice::ble::IdentityKey) {
-// 		info!("on_bonded");
+		// In a real application you would want to signal another task to permanently store the keys in non-volatile memory here.
+		self.sys_attrs.borrow_mut().clear();
+		self.peer.set(Some(Peer {
+			master_id,
+			key,
+			peer_id,
+		}));
+	}
 
-// 		// In a real application you would want to signal another task to permanently store the keys in non-volatile memory here.
-// 		self.sys_attrs.borrow_mut().clear();
-// 		self.peer.set(Some(Peer {
-// 			master_id,
-// 			key,
-// 			peer_id,
-// 		}));
-// 	}
+	fn get_key(&self, _conn: &nrf_softdevice::ble::Connection, master_id: MasterId) -> Option<EncryptionInfo> {
+		debug!("getting bond for: id: {}", master_id);
 
-// 	fn get_key(&self, _conn: &nrf_softdevice::ble::Connection, master_id: MasterId) -> Option<EncryptionInfo> {
-// 		debug!("getting bond for: id: {}", master_id);
+		self.peer
+			.get()
+			.and_then(|peer| (master_id == peer.master_id).then_some(peer.key))
+	}
 
-// 		self.peer
-// 			.get()
-// 			.and_then(|peer| (master_id == peer.master_id).then_some(peer.key))
-// 	}
+	fn save_sys_attrs(&self, conn: &nrf_softdevice::ble::Connection) {
+		debug!("saving system attributes for: {}", conn.peer_address());
 
-// 	fn save_sys_attrs(&self, conn: &nrf_softdevice::ble::Connection) {
-// 		debug!("saving system attributes for: {}", conn.peer_address());
+		if let Some(peer) = self.peer.get() {
+			if peer.peer_id.is_match(conn.peer_address()) {
+				let mut sys_attrs = self.sys_attrs.borrow_mut();
+				let capacity = sys_attrs.capacity();
+				sys_attrs.resize(capacity, 0);
+				let len = unwrap!(gatt_server::get_sys_attrs(conn, &mut sys_attrs)) as u16;
+				sys_attrs.truncate(usize::from(len));
+				// In a real application you would want to signal another task to permanently store sys_attrs for this connection's peer
+			}
+		}
+	}
 
-// 		if let Some(peer) = self.peer.get() {
-// 			if peer.peer_id.is_match(conn.peer_address()) {
-// 				let mut sys_attrs = self.sys_attrs.borrow_mut();
-// 				let capacity = sys_attrs.capacity();
-// 				sys_attrs.resize(capacity, 0);
-// 				let len = unwrap!(gatt_server::get_sys_attrs(conn, &mut sys_attrs)) as u16;
-// 				sys_attrs.truncate(usize::from(len));
-// 				// In a real application you would want to signal another task to permanently store sys_attrs for this connection's peer
-// 			}
-// 		}
-// 	}
+	fn load_sys_attrs(&self, conn: &nrf_softdevice::ble::Connection) {
+		let addr = conn.peer_address();
+		debug!("loading system attributes for: {}", addr);
 
-// 	fn load_sys_attrs(&self, conn: &nrf_softdevice::ble::Connection) {
-// 		let addr = conn.peer_address();
-// 		debug!("loading system attributes for: {}", addr);
+		let attrs = self.sys_attrs.borrow();
+		// In a real application you would search all stored peers to find a match
+		let attrs = if self.peer.get().map(|peer| peer.peer_id.is_match(addr)).unwrap_or(false) {
+			(!attrs.is_empty()).then_some(attrs.as_slice())
+		} else {
+			None
+		};
 
-// 		let attrs = self.sys_attrs.borrow();
-// 		// In a real application you would search all stored peers to find a match
-// 		let attrs = if self.peer.get().map(|peer| peer.peer_id.is_match(addr)).unwrap_or(false) {
-// 			(!attrs.is_empty()).then_some(attrs.as_slice())
-// 		} else {
-// 			None
-// 		};
-
-// 		gatt_server::set_sys_attrs(conn, attrs).unwrap();
-// 	}
-// }
+		gatt_server::set_sys_attrs(conn, attrs).unwrap();
+	}
+}
