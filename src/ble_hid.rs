@@ -5,21 +5,124 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Subscriber;
-use embassy_time::{Timer, Duration};
 use futures::Future;
 use futures::join;
 use heapless::String;
-use nrf_softdevice::ble::gatt_server::{GetValueError, NotifyValueError};
+use nrf_softdevice::ble::advertisement_builder::{AdvertisementDataType, Flag, LegacyAdvertisementBuilder, ServiceList, ServiceUuid16};
+use nrf_softdevice::ble::gatt_server::builder::ServiceBuilder;
+use nrf_softdevice::ble::gatt_server::characteristic::{Attribute, Properties, Metadata};
+use nrf_softdevice::ble::gatt_server::{RegisterError, Service};
 use nrf_softdevice::ble::security::SecurityHandler;
-use nrf_softdevice::ble::{gatt_server, peripheral, MasterId, EncryptionInfo, IdentityKey, GattValue, Connection};
-use nrf_softdevice::{raw, Softdevice};
+use nrf_softdevice::ble::{gatt_server, peripheral, Connection, EncryptionInfo, GattValue, IdentityKey, MasterId, Uuid};
+use nrf_softdevice::Softdevice;
 use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
 
 use reactor::RSubscriber;
 use reactor::reactor_event::*;
-use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
+use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS, hid};
+
+// Main items
+pub const HIDINPUT: u8 = 0x80;
+pub const HIDOUTPUT: u8 = 0x90;
+pub const FEATURE: u8 = 0xb0;
+pub const COLLECTION: u8 = 0xa0;
+pub const END_COLLECTION: u8 = 0xc0;
+
+// Global items
+pub const USAGE_PAGE: u8 = 0x04;
+pub const LOGICAL_MINIMUM: u8 = 0x14;
+pub const LOGICAL_MAXIMUM: u8 = 0x24;
+pub const PHYSICAL_MINIMUM: u8 = 0x34;
+pub const PHYSICAL_MAXIMUM: u8 = 0x44;
+pub const UNIT_EXPONENT: u8 = 0x54;
+pub const UNIT: u8 = 0x64;
+pub const REPORT_SIZE: u8 = 0x74; //bits
+pub const REPORT_ID: u8 = 0x84;
+pub const REPORT_COUNT: u8 = 0x94; //bytes
+pub const PUSH: u8 = 0xa4;
+pub const POP: u8 = 0xb4;
+
+// Local items
+pub const USAGE: u8 = 0x08;
+pub const USAGE_MINIMUM: u8 = 0x18;
+pub const USAGE_MAXIMUM: u8 = 0x28;
+pub const DESIGNATOR_INDEX: u8 = 0x38;
+pub const DESIGNATOR_MINIMUM: u8 = 0x48;
+pub const DESIGNATOR_MAXIMUM: u8 = 0x58;
+pub const STRING_INDEX: u8 = 0x78;
+pub const STRING_MINIMUM: u8 = 0x88;
+pub const STRING_MAXIMUM: u8 = 0x98;
+pub const DELIMITER: u8 = 0xa8;
+
+const KEYBOARD_ID: u8 = 0x01;
+const MEDIA_KEYS_ID: u8 = 0x02;
+
+pub const REPORT_MAP: &[u8] = hid!(
+	(USAGE_PAGE, 0x01),          // USAGE_PAGE (Generic Desktop Ctrls)
+	(USAGE, 0x06),               // USAGE (Keyboard)
+	(COLLECTION, 0x01),          // COLLECTION (Application)
+								 // ------------------------------------------------- Keyboard
+	(REPORT_ID, KEYBOARD_ID),    //   REPORT_ID (1)
+	(USAGE_PAGE, 0x07),          //   USAGE_PAGE (Kbrd/Keypad)
+	(USAGE_MINIMUM, 0xE0),       //   USAGE_MINIMUM (0xE0)
+	(USAGE_MAXIMUM, 0xE7),       //   USAGE_MAXIMUM (0xE7)
+	(LOGICAL_MINIMUM, 0x00),     //   LOGICAL_MINIMUM (0)
+	(LOGICAL_MAXIMUM, 0x01),     //   Logical Maximum (1)
+	(REPORT_SIZE, 0x01),         //   REPORT_SIZE (1)
+	(REPORT_COUNT, 0x08),        //   REPORT_COUNT (8)
+	(HIDINPUT, 0x02),            //   INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+	(REPORT_COUNT, 0x01),        //   REPORT_COUNT (1) ; 1 byte (Reserved)
+	(REPORT_SIZE, 0x08),         //   REPORT_SIZE (8)
+	(HIDINPUT, 0x01),            //   INPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
+	(REPORT_COUNT, 0x05),        //   REPORT_COUNT (5) ; 5 bits (Num lock, Caps lock, Scroll lock, Compose, Kana)
+	(REPORT_SIZE, 0x01),         //   REPORT_SIZE (1)
+	(USAGE_PAGE, 0x08),          //   USAGE_PAGE (LEDs)
+	(USAGE_MINIMUM, 0x01),       //   USAGE_MINIMUM (0x01) ; Num Lock
+	(USAGE_MAXIMUM, 0x05),       //   USAGE_MAXIMUM (0x05) ; Kana
+	(HIDOUTPUT, 0x02),           //   OUTPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+	(REPORT_COUNT, 0x01),        //   REPORT_COUNT (1) ; 3 bits (Padding)
+	(REPORT_SIZE, 0x03),         //   REPORT_SIZE (3)
+	(HIDOUTPUT, 0x01),           //   OUTPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+	(REPORT_COUNT, 0x06),        //   REPORT_COUNT (6) ; 6 bytes (Keys)
+	(REPORT_SIZE, 0x08),         //   REPORT_SIZE(8)
+	(LOGICAL_MINIMUM, 0x00),     //   LOGICAL_MINIMUM(0)
+	(LOGICAL_MAXIMUM, 0x65),     //   LOGICAL_MAXIMUM(0x65) ; 101 keys
+	(USAGE_PAGE, 0x07),          //   USAGE_PAGE (Kbrd/Keypad)
+	(USAGE_MINIMUM, 0x00),       //   USAGE_MINIMUM (0)
+	(USAGE_MAXIMUM, 0x65),       //   USAGE_MAXIMUM (0x65)
+	(HIDINPUT, 0x00),            //   INPUT (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
+	(END_COLLECTION),            // END_COLLECTION
+								 // ------------------------------------------------- Media Keys
+	(USAGE_PAGE, 0x0C),          // USAGE_PAGE (Consumer)
+	(USAGE, 0x01),               // USAGE (Consumer Control)
+	(COLLECTION, 0x01),          // COLLECTION (Application)
+	(REPORT_ID, MEDIA_KEYS_ID),  //   REPORT_ID (2)
+	(USAGE_PAGE, 0x0C),          //   USAGE_PAGE (Consumer)
+	(LOGICAL_MINIMUM, 0x00),     //   LOGICAL_MINIMUM (0)
+	(LOGICAL_MAXIMUM, 0x01),     //   LOGICAL_MAXIMUM (1)
+	(REPORT_SIZE, 0x01),         //   REPORT_SIZE (1)
+	(REPORT_COUNT, 0x10),        //   REPORT_COUNT (16)
+	(USAGE, 0xB5),               //   USAGE (Scan Next Track)     ; bit 0: 1
+	(USAGE, 0xB6),               //   USAGE (Scan Previous Track) ; bit 1: 2
+	(USAGE, 0xB7),               //   USAGE (Stop)                ; bit 2: 4
+	(USAGE, 0xCD),               //   USAGE (Play/Pause)          ; bit 3: 8
+	(USAGE, 0xE2),               //   USAGE (Mute)                ; bit 4: 16
+	(USAGE, 0xE9),               //   USAGE (Volume Increment)    ; bit 5: 32
+	(USAGE, 0xEA),               //   USAGE (Volume Decrement)    ; bit 6: 64
+	(USAGE, 0x23, 0x02),         //   Usage (WWW Home)            ; bit 7: 128
+	(USAGE, 0x94, 0x01),         //   Usage (My Computer) ; bit 0: 1
+	(USAGE, 0x92, 0x01),         //   Usage (Calculator)  ; bit 1: 2
+	(USAGE, 0x2A, 0x02),         //   Usage (WWW fav)     ; bit 2: 4
+	(USAGE, 0x21, 0x02),         //   Usage (WWW search)  ; bit 3: 8
+	(USAGE, 0x26, 0x02),         //   Usage (WWW stop)    ; bit 4: 16
+	(USAGE, 0x24, 0x02),         //   Usage (WWW back)    ; bit 5: 32
+	(USAGE, 0x83, 0x01),         //   Usage (Media sel)   ; bit 6: 64
+	(USAGE, 0x8A, 0x01),         //   Usage (Mail)        ; bit 7: 128
+	(HIDINPUT, 0x02),            // INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+	(END_COLLECTION),            // END_COLLECTION
+);
 
 #[nrf_softdevice::gatt_service(uuid = "180f")]
 pub struct BatteryService {
@@ -27,12 +130,13 @@ pub struct BatteryService {
 	battery_level: u8,
 }
 
+// #[repr(packed)]
 // pub struct KeyboardReport {
 // 	pub modifier: u8,
 // 	pub reserved: u8,
-// 	pub leds: u8,
 // 	pub keycodes: [u8; 6],
 // }
+
 #[repr(u8)]
 #[derive(Clone, Copy)]
 pub enum VidSource {
@@ -107,71 +211,132 @@ pub struct DeviceInformationService {
 	pnp_id: PnPID,
 }
 
-#[nrf_softdevice::gatt_service(uuid = "1812")]
-pub struct KeyboardService {
-	#[characteristic(uuid = "2a4a", read)]
-	hid_information: [u8; 4], // Typically, the HID Information is 4 bytes, but it can vary.
-
-	#[characteristic(uuid = "2a4c", write, write_without_response)]
-	hid_control_point: u8, // HID Control Point, used for control commands like "suspend" or "exit suspend".
-
-	// Boot Keyboard Input Report
-	// #[characteristic(uuid = "2a22", read, notify, getter="input_getter")]
-	#[characteristic(uuid = "2a22", read, write, notify)]
-	boot_input: [u8; 8], // This size can vary based on your needs.
-
-	// Boot Keyboard Output Report (LED states like Caps Lock)
-	#[characteristic(uuid = "2a32", read, write, write_without_response)]
-	boot_output: u8,
-
-	// HID Report Map (describes the format of the HID reports)
-	#[characteristic(uuid = "2a4b", read)]
-	// report_map: [u8; 47], // This will be an array that describes the report format.
-	report_map: [u8; 76], // This will be an array that describes the report format.
-
-	// #[characteristic(uuid = "2a4d", read, write, notify, getter="input_getter", notifier="input_notifier")]
-	#[characteristic(uuid = "2a4d", read, notify, indicate)]
-	report: [u8; 8], // This is the actual report data.
-
-	#[characteristic(uuid = "2a4e", read, write, write_without_response)]
-	protocol_mode: u8, // Protocol Mode (boot/report mode)
+pub struct HIDService {
+	hid_info: u16,
+	report_map: u16,
+	hid_control: u16,
+	protocol_mode: u16,
+	input_keyboard: u16,
+	output_keyboard: u16,
+	input_media_keys: u16,
+	active_conn_handle: Option<u16>,
 }
 
-impl KeyboardService {
-	pub fn input_getter(&self, _sd: &Softdevice, _value_handle: u16) -> Result<[u8; 8], GetValueError> {
-		info!("---> input_getter!!");
-		Ok([0, 0, 4, 5, 6, 7, 8, 9])
+impl HIDService {
+	pub fn new(sd: &mut Softdevice) -> Result<Self, RegisterError> {
+		let mut service_builder = ServiceBuilder::new(sd, Uuid::new_16(0x1812))?;
+
+		let hid_info = service_builder.add_characteristic(
+			Uuid::new_16(0x2A4A),
+			Attribute::new([0x11u8, 0x1u8, 0x00u8, 0x01u8]),
+			Metadata::new(Properties::new().read()))?;
+		let hid_info_handle = hid_info.build();
+
+		let report_map = service_builder.add_characteristic(
+			Uuid::new_16(0x2A4B),
+			Attribute::new(REPORT_MAP),
+			Metadata::new(Properties::new().read()))?;
+		let report_map_handle = report_map.build();
+
+		let hid_control = service_builder.add_characteristic(
+			Uuid::new_16(0x2A4C),
+			Attribute::new([0u8]),
+			Metadata::new(Properties::new().write_without_response()))?;
+		let hid_control_handle = hid_control.build();
+
+		let mut input_keyboard = service_builder.add_characteristic(
+			Uuid::new_16(0x2A4D),
+			Attribute::new([0u8; 8]),
+			Metadata::new(Properties::new().read().notify()))?;
+		let input_keyboard_desc = input_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 1u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys), second is in/out
+		let input_keyboard_handle = input_keyboard.build();
+
+		let mut output_keyboard = service_builder.add_characteristic(
+			Uuid::new_16(0x2A4D),
+			Attribute::new([0u8; 8]),
+			Metadata::new(Properties::new().read().write().write_without_response()))?;
+		let output_keyboard_desc = output_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 2u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys)
+		let output_keyboard_handle = output_keyboard.build();
+
+		let mut input_media_keys = service_builder.add_characteristic(
+			Uuid::new_16(0x2A4D),
+			Attribute::new([0u8; 16]),
+			Metadata::new(Properties::new().read().notify()))?;
+		let input_media_keys_desc = input_media_keys.add_descriptor(Uuid::new_16(0x2908), Attribute::new([MEDIA_KEYS_ID, 1u8]))?;
+		let input_media_keys_handle = input_media_keys.build();
+
+		let protocol_mode = service_builder.add_characteristic(
+			Uuid::new_16(0x2A4E),
+			Attribute::new([1u8]),
+			Metadata::new(Properties::new().read().write_without_response()))?;
+		let protocol_mode_handle = protocol_mode.build();
+
+		let _service_handle = service_builder.build();
+
+		Ok(HIDService {
+			hid_info: hid_info_handle.value_handle,
+			report_map: report_map_handle.value_handle,
+			hid_control: hid_control_handle.value_handle,
+			protocol_mode: protocol_mode_handle.value_handle,
+			input_keyboard: input_keyboard_handle.value_handle,
+			output_keyboard: output_keyboard_handle.value_handle,
+			input_media_keys: input_media_keys_handle.value_handle,
+			active_conn_handle: None,
+		})
 	}
 
-	pub fn input_notifier(&self, _conn: &Connection, _value_handle: u16, val: &[u8; 8]) -> Result<(), NotifyValueError> {
-		info!("---> input_notifier!! {:?}", val);
-		Ok(())
+	pub fn send_report(&self, conn: &Connection, report: &KeyboardReport) {
+		let report_bytes = [
+			report.modifier,
+			0,
+			report.keycodes[0],
+			report.keycodes[1],
+			report.keycodes[2],
+			report.keycodes[3],
+			report.keycodes[4],
+			report.keycodes[5],
+		];
+		gatt_server::notify_value(conn, self.input_keyboard, &report_bytes).unwrap();
 	}
 }
+type HIDServiceEvent = ();
 
-// pub struct HidReportAttribute<T: AsRef<[u8]>>(Attribute<T>);
+impl Service for HIDService {
+	type Event = HIDServiceEvent;
+	fn on_write(&self, handle: u16, data: &[u8]) -> Option<Self::Event> {
+		info!("HIDService::on_write: handle: {:x}, data: {:?}", handle, data);
 
-// impl<T: AsRef<[u8]>> HidReportAttribute<T> {
-// 	pub fn new(value: T) -> Self {
-// 		Self(Attribute::new(value))
-// 	}
+		if handle == self.output_keyboard && self.active_conn_handle.is_some() {
+			let conn = Connection::from_handle(self.active_conn_handle.unwrap()).unwrap();
+			if data.len() > 0 {
+				let report = if data[0] == 0x01 {
+					KeyboardReport {
+						modifier: 0,
+						reserved: 0,
+						leds: 0,
+						keycodes: [0x0A, 0, 0, 0, 0, 0],
+					}
+				} else {
+					KeyboardReport {
+						modifier: 0,
+						reserved: 0,
+						leds: 0,
+						keycodes: [0; 6],
+					}
+				};
 
-// 	pub fn deferred_read(&self) -> Attribute<T> {
-// 		info!("deferred_read");
-// 		self.0.deferred_read()
-// 	}
-
-// 	pub fn read_security(self, security: nrf_softdevice::ble::SecurityMode) -> Self {
-// 		info!("read_security");
-// 		Self(self.0.read_security(security))
-// 	}
-// }
+				self.send_report(&conn, &report);
+			}
+		}
+		None
+	}
+}
 
 #[nrf_softdevice::gatt_server]
 pub struct Server {
 	bas: BatteryService,
-	keyboard: KeyboardService,
-	device_information: DeviceInformationService,
+	hid: HIDService,
+	dis: DeviceInformationService,
 }
 
 pub struct BleHid<'a> {
@@ -183,123 +348,40 @@ pub struct BleHid<'a> {
 }
 
 impl<'a> BleHid<'a> {
-    pub async fn run(&mut self) {
-		#[rustfmt::skip]
-		let adv_data = &[
-			0x02, 0x01, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
-			// 0x03, 0x03, 0x0f, 0x18, // 3 bytes wide, Battery service
-			// 0x03, 0x03, 0x12, 0x18, // 3 bytes wide, HID service
-			// 0x0a, 0x0c, b"PubSubinator"[..],
-			// 0x0a, 0x0c, b'P', b'u', b'b', b'S', b'u', b'b', b'i', b'n', b'a', b't', b'o', b'r',
-			0x0a, 0x09, b'P', b'u', b'b', b'S', b'u', b'b', b'i', b'n', b'a',
-		];
-		#[rustfmt::skip]
-		let scan_data = &[
-			0x03, 0x03, 0x0f, 0x18, // 3 bytes wide, Battery service
-			0x03, 0x03, 0x12, 0x18, // 3 bytes wide, HID service
-		];
+	pub async fn run(&mut self) {
+		let adv_data = LegacyAdvertisementBuilder::new()
+			.flags(&[Flag::GeneralDiscovery, Flag::LE_Only])
+			.services_16(ServiceList::Incomplete, &[ServiceUuid16::BATTERY, ServiceUuid16::HUMAN_INTERFACE_DEVICE])
+			.full_name("PubSubinator")
+			.raw(AdvertisementDataType::APPEARANCE, &[0xC1, 0x03])
+			.build();
 
-		self.server.device_information.model_number_set(&String::from("Launchpad")).unwrap();
-		self.server.device_information.serial_number_set(&String::from("123456")).unwrap();
-		self.server.device_information.manufacturer_name_set(&String::from("PubSubinator")).unwrap();
-		self.server.device_information.pnp_id_set(&PnPID {
+		let scan_data = LegacyAdvertisementBuilder::new()
+			.services_16(ServiceList::Complete, &[ServiceUuid16::BATTERY, ServiceUuid16::DEVICE_INFORMATION, ServiceUuid16::HUMAN_INTERFACE_DEVICE])
+			.build();
+
+		self.server.dis.model_number_set(&String::try_from("Launchpad").unwrap()).unwrap();
+		self.server.dis.serial_number_set(&String::try_from("123456").unwrap()).unwrap();
+		self.server.dis.manufacturer_name_set(&String::try_from("PubSubinator").unwrap()).unwrap();
+		self.server.dis.pnp_id_set(&PnPID {
 			vid_source: VidSource::UsbIF,
-			vendor_id: 0x10C4,
-			product_id: 0x0001,
-			product_version: 0x0001,
+			vendor_id: 0x05AC,
+			product_id: 0x820A,
+			product_version: 0x0100,
 		}).unwrap();
-		// self.server.device_information.pnp_id.vendor_id_set(&0x0002).unwrap();
-		// self.server.device_information.pnp_id.product_version_set(&0x0003).unwrap();
 
-		self.server.keyboard.report_set(&[0x12, 0x34, 0xac, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
-		self.server.keyboard.hid_information_set(&[
-			0x11, 0x01, // bcdHID (USB HID version)
-			0x00, // bCountryCode
-			0x01, // Flags
-				  // Bit 0: Indicates if the device is capable of sending a wake signal to a host. If it can, this bit is set to 1, otherwise 0.
-				  // Bit 1: Indicates if the device is in Normally Connectable mode (0) or not (1).
-				  // Bit 2: This flag indicates if the device supports Boot Protocol Mode. For a Boot Keyboard, this bit should be set to 1.
-		]).unwrap();
-
-		self.server.keyboard.report_map_set(&[
-			// Report map
-			0x05, 0x01, // Usage Page (Generic Desktop)
-			0x09, 0x06, // Usage (Keyboard)
-			0xa1, 0x01, // Collection (Application)
-			0x85, 0x01, //   Report ID (1)
-			0x05, 0x07, //   Usage Page (Keyboard)
-			0x19, 0xe0, //   Usage Minimum (Keyboard LeftControl)
-			0x29, 0xe7, //   Usage Maximum (Keyboard Right GUI)
-			0x15, 0x00, //   Logical Minimum (0)
-			0x25, 0x01, //   Logical Maximum (1)
-			0x75, 0x01, //   Report Size (1)
-			0x95, 0x08, //   Report Count (8)
-			0x81, 0x02, //   Input (Data, Variable, Absolute) Modifier byte
-
-			0x95, 0x01, //   Report Count (1)
-			0x75, 0x08, //   Report Size (8)
-			0x81, 0x01, //   Input (Constant) Reserved byte
-
-			0x95, 0x05, //   Report Count (5) - Num lock, Caps lock, Scroll lock, Compose, Kana
-			0x75, 0x01, //   Report Size (1)
-			0x05, 0x08, //   Usage Page (LEDs)
-			0x19, 0x01, //   Usage Minimum (Num Lock)
-			0x29, 0x05, //   Usage Maximum (Kana)
-			0x91, 0x02, //   Output (Data, Variable, Absolute) LED report
-
-			0x95, 0x01, //   Report Count (1)
-			0x75, 0x03, //   Report Size (3)
-			0x91, 0x01, //   Output (Data, Variable, Absolute) LED report padding
-
-			0x95, 0x06, //   Report Count (6)
-			0x75, 0x08, //   Report Size (8)
-			0x15, 0x00, //   Logical Minimum (0)
-			0x25, 0x65, //   Logical Maximum (101)
-			0x19, 0x00, //   Usage Minimum (0)
-			0x29, 0x65, //   Usage Maximum (101)
-			0x81, 0x00, //   Input (Data, Array) Key Array (6 bytes)
-
-			0x09, 0x05,       //   Usage (Vendor Defined)
-			0x15, 0x00,       //   Logical Minimum (0)
-			0x26, 0xFF, 0x00, //   Logical Maximum (255)
-			0x75, 0x08,       //   Report Count (2)
-			0x95, 0x02,       //   Report Size (8 bit)
-			0xB1, 0x02,       //   Feature (Data, Variable, Absolute)
-
-			0xc0, // End Collection
-		]).unwrap();
-
-		self.server.keyboard.protocol_mode_set(&0x01).unwrap();
-
-		// self.server.keyboard.boot_input_set(&[0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
 		self.server.bas.battery_level_set(&66).unwrap();
 
 		loop {
 			let config = peripheral::Config::default();
-			let adv = peripheral::ConnectableAdvertisement::ScannableUndirected { adv_data, scan_data };
+			let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
+				adv_data: &adv_data,
+				scan_data: &scan_data
+			};
+
 			// let conn = peripheral::advertise_connectable(self.softdevice, adv, &config).await.unwrap();
 			let conn = peripheral::advertise_pairable(self.softdevice, adv, &config, self.security_handler).await.unwrap();
-
-			let dumb_loop = || async {
-				let mut flag = false;
-				loop {
-					Timer::after(Duration::from_millis(1000)).await;
-					if flag {
-						info!("Sending empty report");
-						self.server.keyboard.report_set(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
-						// self.server.keyboard.report_notify(&conn, &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
-						self.server.keyboard.boot_input_set(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]).unwrap();
-					} else {
-						info!("Sending button report");
-						self.server.keyboard.report_set(&[0x00, 0x00, 0x07, 0x08, 0x09, 0x00, 0x00, 0x00]).unwrap();
-						self.server.keyboard.boot_input_set(&[0x00, 0x00, 0x07, 0x08, 0x09, 0x00, 0x00, 0x00]).unwrap();
-						// self.server.keyboard.report_notify(&conn, &[0x00, 0x00, 0x04, 0x05, 0x06, 0x00, 0x00, 0x00]).unwrap();
-						// self.server.keyboard.report_indicate(&conn, &[0x00, 0x00, 0x04, 0x05, 0x06, 0x00, 0x00, 0x00]).unwrap();
-					}
-
-					flag = !flag;
-				}
-			};
+			self.server.hid.active_conn_handle = conn.handle();
 
 			info!("advertising done!");
 
@@ -307,50 +389,17 @@ impl<'a> BleHid<'a> {
 			//
 			// Event enums (ServerEvent's) are generated by nrf_softdevice::gatt_server
 			// proc macro when applied to the Server struct above
-			// let e = gatt_server::run(&conn, &self.server, |e| match e {
-			join!(gatt_server::run(&conn, &self.server, |e| match e {
+			gatt_server::run(&conn, &self.server, |e| match e {
 				ServerEvent::Bas(e) => match e {
 					BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
 						info!("battery notifications: {}", notifications)
 					}
 				},
-				ServerEvent::Keyboard(e) => match e {
-					KeyboardServiceEvent::HidControlPointWrite(d) => {
-						info!("HID control point: {:?}", d)
-					},
-					// KeyboardServiceEvent::BootInputCccdWrite { notifications } => {
-					// 	info!("boot input notifications: {}", notifications)
-					// },
-					// KeyboardServiceEvent::BootOutputWrite(d) => {
-					// 	info!("boot output: {:?}", d)
-					// },
-					KeyboardServiceEvent::ProtocolModeWrite(d) => {
-						info!("protocol mode: {:?}", d);
-						// self.server.keyboard.protocol_mode_set(&0x00).unwrap();
-					},
-					KeyboardServiceEvent::BootInputWrite(d) => {
-						info!("boot input: {:?}", d);
-					},
-					// KeyboardServiceEvent::ReportWrite(d) => {
-					// 	info!("report: {:?}", d);
-					// },
-					KeyboardServiceEvent::BootInputCccdWrite { notifications } => {
-						info!("report notifications: {}", notifications)
-					},
-					KeyboardServiceEvent::ReportCccdWrite { notifications, indications } => {
-						info!("report notifications: {} - {}", notifications, indications)
-					},
-					KeyboardServiceEvent::BootOutputWrite(d) => {
-						info!("boot output: {:?}", d);
-					},
+				ServerEvent::Hid(e) => {
+					info!("HID event: {:?}", e)
 				},
-				ServerEvent::DeviceInformation(e) => match e {
-
-				}
-			}), dumb_loop());
-			// .await;
-
-			// info!("gatt_server run exited with error: {:?}", e);
+				ServerEvent::Dis(_e) => {}
+			}).await;
 		}
 	}
 }
@@ -396,6 +445,7 @@ impl<'a> RSubscriber for BleHid<'a> {
 					return;
 				},
 			}
+			// self.server.hid.send_report(self.conn.as_ref().unwrap(), &self.report);
 		})
 	}
 }

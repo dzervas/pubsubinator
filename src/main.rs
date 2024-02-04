@@ -1,9 +1,19 @@
 #![no_std]
 #![no_main]
-#![feature(async_fn_in_trait)]
 #![feature(generic_arg_infer)]
 #![feature(trait_alias)]
 #![feature(type_alias_impl_trait)]
+#![feature(decl_macro)]
+
+#[allow(unused_macros)]
+macro count {
+	() => { 0u8 },
+	($x:tt $($xs:tt)*) => {1u8 + count!($($xs)*)}
+}
+
+pub macro hid {
+	($(( $($xs:tt),*)),+ $(,)?) => { &[ $( (count!($($xs)*)-1) | $($xs),* ),* ] }
+}
 
 extern crate alloc;
 extern crate defmt_rtt;
@@ -43,10 +53,6 @@ use embassy_nrf::{bind_interrupts, peripherals, usb, saadc};
 // BLE HID
 // TODO: Use the generic HID report
 use usbd_hid::descriptor::KeyboardReport;
-// use nrf_softdevice::ble::gatt_server::builder::ServiceBuilder;
-// use nrf_softdevice::ble::gatt_server::characteristic::Attribute;
-// use nrf_softdevice::ble::gatt_server::characteristic::{Metadata, Properties};
-// use nrf_softdevice::ble::Uuid;
 
 pub mod matrix;
 pub mod analog_nrf;
@@ -211,13 +217,6 @@ async fn main(spawner: Spawner) {
 	let server = unwrap!(ble_hid::Server::new(sd));
 
 	// -- Setup BLE HID consumer --
-	// let services = ServiceBuilder::new(sd, Uuid::new_16(0x1812)).unwrap()
-	// 	.add_characteristic(Uuid::new_16(0x2A4B), Attribute::new([0, 0, 0]), Metadata::new(Properties {
-	// 		read: true,
-	// 		..Default::default()
-	// 	})).unwrap()
-	// 	.build();
-
 	let ble_hid = make_static!(BleHid {
 		softdevice: sd,
 		server,
@@ -237,7 +236,7 @@ async fn main(spawner: Spawner) {
 	spawner.spawn(softdevice_task(sd)).unwrap();
 	info!("SoftDevice initialized");
 
-	// let subs_task = reactor_macros::subscribers_task!(CHANNEL, [usb_hid, keymap]);
+	// let subs_task = reactor_macros::subscribers_task!(CHANNEL, [ble_hid, keymap]);
 	// spawner.spawn(subs_task).unwrap();
 }
 

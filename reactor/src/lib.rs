@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(async_fn_in_trait)]
 
 extern crate alloc;
 
@@ -16,6 +15,7 @@ pub use crate::reactor_event::*;
 pub trait RPublisher {}
 
 pub trait Interrupted: RPublisher {
+	#[allow(async_fn_in_trait)]
 	async fn handler(&mut self);
 }
 

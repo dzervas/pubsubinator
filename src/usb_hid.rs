@@ -107,7 +107,7 @@ impl RSubscriber for UsbHid {
 			}
 
 			self.writer.as_mut().unwrap().ready().await;
-			self.writer.as_mut().unwrap().write_serialize(&self.report).await.unwrap();
+			// self.writer.as_mut().unwrap().write_serialize(&self.report).await.unwrap();
 		})
 	}
 }

@@ -4,7 +4,7 @@ use core::pin::Pin;
 use alloc::{vec::Vec, boxed::Box};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
-use embedded_hal::digital::v2::{InputPin, OutputPin};
+use embedded_hal::digital::{InputPin, OutputPin};
 use futures::Future;
 use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use reactor::reactor_event::*;
@@ -45,7 +45,7 @@ impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Matrix<'a,
 		}
 	}
 
-	fn read(&self, index: usize) -> bool {
+	fn read(&mut self, index: usize) -> bool {
 		self.inputs[index].is_high().unwrap()
 	}
 
