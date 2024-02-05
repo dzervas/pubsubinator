@@ -30,8 +30,8 @@ pub fn usb_init(p_usbd: peripherals::USBD) -> Builder<'static, UsbDriver> {
 	let driver = Driver::new(p_usbd, Irqs, &*VBUS_DETECT);
 
 	let mut usb_config = Config::new(0xc0de, 0xcafe);
-	usb_config.manufacturer = Some("DZervas");
-	usb_config.product = Some("PubSubinator");
+	usb_config.manufacturer = Some("PubSubinator");
+	usb_config.product = Some("LaunchPad");
 	usb_config.serial_number = Some(env!("CARGO_PKG_VERSION"));
 	usb_config.max_power = 100;
 	usb_config.max_packet_size_0 = 64;

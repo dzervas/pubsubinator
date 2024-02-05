@@ -1,62 +1,115 @@
 [package]
 name = "pubsubinator"
-version = "0.1.2"
 edition = "2021"
+version = "0.1.2"
 
 [dependencies]
-embassy-executor   = { version = "0.5.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"] }
-embassy-futures    = "0.1.1"
-embassy-sync       = { version = "0.5.0" }
-embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"] }
-embassy-usb        = { version = "0.1.0", optional = true, features = ["defmt"] }
-
-embassy-rp    = { version = "0.1.0", optional = true}
-embassy-nrf   = { version = "0.1.0", optional = true, features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time"]}
-embassy-stm32 = { version = "0.1.0", optional = true}
-
-defmt = "0.3"
-defmt-rtt = "0.4"
-panic-probe = { version = "0.3.1", features = ["defmt", "defmt-error", "print-defmt"] }
-fixed = "1.24.0"
-static_cell = "2.0.0"
-
 cortex-m = "0.7.7"
 cortex-m-rt = "0.7.3"
-rand = { version = "0.8.5", default-features = false }
-futures = { version = "0.3.30", default-features = false, features = ["async-await"] }
-
-embedded-hal = { version = "1.0.0" }
-embedded-hal-async = { version = "1.0.0", optional = true }
-embedded-hal-bus = { version = "0.1.0" }
-
-usbd-hid = "0.6.1"
+defmt = "0.3"
+defmt-rtt = "0.4"
+embassy-futures = "0.1.1"
 embedded-alloc = "0.5.1"
-usb-device = { version = "0.3.1", features = ["defmt"] }
-
-nrf-softdevice = { version = "0.1.0", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
-# nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice", features = ["defmt", "nrf52840", "s140", "ble-central", "ble-peripheral", "ble-l2cap", "ble-gatt-server", "ble-gatt-client", "ble-rssi", "ble-sec", "critical-section-impl", "usable-from-interrupts" ] }
-lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-
-reactor = { version = "0.1.0", path = "reactor" }
-reactor-macros = { version = "0.1.0", path = "reactor-macros" }
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+embedded-hal-bus = "0.1.0"
+fixed = "1.24.0"
 heapless = "0.8.0"
 
+[dependencies.embassy-executor]
+version = "0.5.0"
+features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"]
+
+[dependencies.embassy-nrf]
+version = "0.1.0"
+features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time"]
+optional = true
+
+[dependencies.embassy-rp]
+version = "0.1.0"
+features = []
+optional = true
+
+[dependencies.embassy-stm32]
+version = "0.1.0"
+features = []
+optional = true
+
+[dependencies.embassy-sync]
+version = "0.5.0"
+features = []
+
+[dependencies.embassy-time]
+version = "0.3.0"
+features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"]
+
+[dependencies.embassy-usb]
+version = "0.1.0"
+features = ["defmt"]
+optional = true
+
+[dependencies.futures]
+version = "0.3.30"
+features = ["async-await"]
+default-features = false
+
+[dependencies.lazy_static]
+version = "1.4.0"
+features = ["spin_no_std"]
+
+[dependencies.nrf-softdevice]
+version = "0.1.0"
+features = ["ble-sec", "ble-gatt", "ble-gatt-server", "ble-peripheral", "nrf52840", "ble-l2cap", "defmt", "nrf-softdevice-s140", "critical-section-impl", "s140", "ble-rssi", "usable-from-interrupts", "nrf52840-pac", "ble-gatt-client"]
+optional = true
+default-features = false
+
+[dependencies.panic-probe]
+version = "0.3.1"
+features = ["defmt", "defmt-error", "print-defmt"]
+
+[dependencies.rand]
+version = "0.8.5"
+features = []
+default-features = false
+
+[dependencies.reactor]
+version = "0.1.0"
+path = "reactor"
+features = []
+
+[dependencies.reactor-macros]
+version = "0.1.0"
+path = "reactor-macros"
+features = []
+
+[dependencies.static_cell]
+version = "2.0.0"
+features = ["nightly"]
+
+[dependencies.usb-device]
+version = "0.3.1"
+features = ["defmt"]
+optional = true
+
+[dependencies.usbd-hid]
+version = "0.6.1"
+features = []
+optional = true
+
 [features]
-default = [
-	"nrf52840",
-	"nightly",
-]
-
-# Hardware targets
-rp = ["dep:embassy-rp"]
-nrf = ["dep:embassy-nrf"]
-stm32 = ["dep:embassy-stm32"]
-nightly = [
-	"static_cell/nightly",
-	"embassy-usb",
-	"embedded-hal-async",
-	"embassy-executor/nightly",
-]
-
-# nRF targets
+ble = ["dep:nrf-softdevice"]
+default = ["nrf52840", "ble", "usb"]
+nrf = ["dep:embassy-nrf", "dep:nrf-softdevice"]
 nrf52840 = ["nrf"]
+rp = ["dep:embassy-rp"]
+stm32 = ["dep:embassy-stm32"]
+usb = ["dep:embassy-usb", "dep:usbd-hid", "dep:usb-device"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release.package]

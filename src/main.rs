@@ -237,6 +237,5 @@ async fn poller_task(poller: &'static mut dyn Polled) {
 		// TODO: Turn this into a join of all pollers
 		poller.poll().await;
 		ticker.next().await;
-		// Timer::after(Duration::from_millis(100)).await;
 	}
 }
