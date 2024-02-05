@@ -1,12 +1,12 @@
+use defmt::*;
 use embassy_executor::task;
-use embassy_nrf::usb::vbus_detect::SoftwareVbusDetect;
-use embassy_nrf::peripherals;
-use embassy_nrf::usb::Driver;
 use embassy_nrf::interrupt::{InterruptExt, Priority};
 use embassy_nrf::pac::Interrupt;
-use embassy_usb::{Config, Builder};
+use embassy_nrf::peripherals;
+use embassy_nrf::usb::vbus_detect::SoftwareVbusDetect;
+use embassy_nrf::usb::Driver;
+use embassy_usb::{Builder, Config};
 use static_cell::make_static;
-use defmt::*;
 
 use crate::{Irqs, VBUS_DETECT};
 

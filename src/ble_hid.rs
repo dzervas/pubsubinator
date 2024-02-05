@@ -11,21 +11,25 @@ use embassy_sync::pubsub::Subscriber;
 use futures::Future;
 // use heapless::pool::arc::Arc;
 use heapless::String;
-use nrf_softdevice::ble::advertisement_builder::{AdvertisementDataType, Flag, LegacyAdvertisementBuilder, ServiceList, ServiceUuid16};
+use nrf_softdevice::ble::advertisement_builder::{
+	AdvertisementDataType, Flag, LegacyAdvertisementBuilder, ServiceList, ServiceUuid16,
+};
 use nrf_softdevice::ble::gatt_server::builder::ServiceBuilder;
-use nrf_softdevice::ble::gatt_server::characteristic::{Attribute, Properties, Metadata};
+use nrf_softdevice::ble::gatt_server::characteristic::{Attribute, Metadata, Properties};
 use nrf_softdevice::ble::gatt_server::{RegisterError, Service};
 use nrf_softdevice::ble::security::SecurityHandler;
-use nrf_softdevice::ble::{gatt_server, peripheral, Connection, EncryptionInfo, GattValue, IdentityKey, MasterId, Uuid};
+use nrf_softdevice::ble::{
+	gatt_server, peripheral, Connection, EncryptionInfo, GattValue, IdentityKey, MasterId, Uuid,
+};
 use nrf_softdevice::Softdevice;
 use static_cell::make_static;
 use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
 
-use reactor::RSubscriber;
+use crate::{hid, PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 use reactor::reactor_event::*;
-use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS, hid};
+use reactor::RSubscriber;
 
 // Main items
 pub const HIDINPUT: u8 = 0x80;
@@ -64,68 +68,68 @@ const KEYBOARD_ID: u8 = 0x01;
 const MEDIA_KEYS_ID: u8 = 0x02;
 
 pub const REPORT_MAP: &[u8] = hid!(
-	(USAGE_PAGE, 0x01),          // USAGE_PAGE (Generic Desktop Ctrls)
-	(USAGE, 0x06),               // USAGE (Keyboard)
-	(COLLECTION, 0x01),          // COLLECTION (Application)
-								 // ------------------------------------------------- Keyboard
-	(REPORT_ID, KEYBOARD_ID),    //   REPORT_ID (1)
-	(USAGE_PAGE, 0x07),          //   USAGE_PAGE (Kbrd/Keypad)
-	(USAGE_MINIMUM, 0xE0),       //   USAGE_MINIMUM (0xE0)
-	(USAGE_MAXIMUM, 0xE7),       //   USAGE_MAXIMUM (0xE7)
-	(LOGICAL_MINIMUM, 0x00),     //   LOGICAL_MINIMUM (0)
-	(LOGICAL_MAXIMUM, 0x01),     //   Logical Maximum (1)
-	(REPORT_SIZE, 0x01),         //   REPORT_SIZE (1)
-	(REPORT_COUNT, 0x08),        //   REPORT_COUNT (8)
-	(HIDINPUT, 0x02),            //   INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	(REPORT_COUNT, 0x01),        //   REPORT_COUNT (1) ; 1 byte (Reserved)
-	(REPORT_SIZE, 0x08),         //   REPORT_SIZE (8)
-	(HIDINPUT, 0x01),            //   INPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	(REPORT_COUNT, 0x05),        //   REPORT_COUNT (5) ; 5 bits (Num lock, Caps lock, Scroll lock, Compose, Kana)
-	(REPORT_SIZE, 0x01),         //   REPORT_SIZE (1)
-	(USAGE_PAGE, 0x08),          //   USAGE_PAGE (LEDs)
-	(USAGE_MINIMUM, 0x01),       //   USAGE_MINIMUM (0x01) ; Num Lock
-	(USAGE_MAXIMUM, 0x05),       //   USAGE_MAXIMUM (0x05) ; Kana
-	(HIDOUTPUT, 0x02),           //   OUTPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-	(REPORT_COUNT, 0x01),        //   REPORT_COUNT (1) ; 3 bits (Padding)
-	(REPORT_SIZE, 0x03),         //   REPORT_SIZE (3)
-	(HIDOUTPUT, 0x01),           //   OUTPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-	(REPORT_COUNT, 0x06),        //   REPORT_COUNT (6) ; 6 bytes (Keys)
-	(REPORT_SIZE, 0x08),         //   REPORT_SIZE(8)
-	(LOGICAL_MINIMUM, 0x00),     //   LOGICAL_MINIMUM(0)
-	(LOGICAL_MAXIMUM, 0x65),     //   LOGICAL_MAXIMUM(0x65) ; 101 keys
-	(USAGE_PAGE, 0x07),          //   USAGE_PAGE (Kbrd/Keypad)
-	(USAGE_MINIMUM, 0x00),       //   USAGE_MINIMUM (0)
-	(USAGE_MAXIMUM, 0x65),       //   USAGE_MAXIMUM (0x65)
-	(HIDINPUT, 0x00),            //   INPUT (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	(END_COLLECTION),            // END_COLLECTION
-								 // ------------------------------------------------- Media Keys
-	(USAGE_PAGE, 0x0C),          // USAGE_PAGE (Consumer)
-	(USAGE, 0x01),               // USAGE (Consumer Control)
-	(COLLECTION, 0x01),          // COLLECTION (Application)
-	(REPORT_ID, MEDIA_KEYS_ID),  //   REPORT_ID (2)
-	(USAGE_PAGE, 0x0C),          //   USAGE_PAGE (Consumer)
-	(LOGICAL_MINIMUM, 0x00),     //   LOGICAL_MINIMUM (0)
-	(LOGICAL_MAXIMUM, 0x01),     //   LOGICAL_MAXIMUM (1)
-	(REPORT_SIZE, 0x01),         //   REPORT_SIZE (1)
-	(REPORT_COUNT, 0x10),        //   REPORT_COUNT (16)
-	(USAGE, 0xB5),               //   USAGE (Scan Next Track)     ; bit 0: 1
-	(USAGE, 0xB6),               //   USAGE (Scan Previous Track) ; bit 1: 2
-	(USAGE, 0xB7),               //   USAGE (Stop)                ; bit 2: 4
-	(USAGE, 0xCD),               //   USAGE (Play/Pause)          ; bit 3: 8
-	(USAGE, 0xE2),               //   USAGE (Mute)                ; bit 4: 16
-	(USAGE, 0xE9),               //   USAGE (Volume Increment)    ; bit 5: 32
-	(USAGE, 0xEA),               //   USAGE (Volume Decrement)    ; bit 6: 64
-	(USAGE, 0x23, 0x02),         //   Usage (WWW Home)            ; bit 7: 128
-	(USAGE, 0x94, 0x01),         //   Usage (My Computer) ; bit 0: 1
-	(USAGE, 0x92, 0x01),         //   Usage (Calculator)  ; bit 1: 2
-	(USAGE, 0x2A, 0x02),         //   Usage (WWW fav)     ; bit 2: 4
-	(USAGE, 0x21, 0x02),         //   Usage (WWW search)  ; bit 3: 8
-	(USAGE, 0x26, 0x02),         //   Usage (WWW stop)    ; bit 4: 16
-	(USAGE, 0x24, 0x02),         //   Usage (WWW back)    ; bit 5: 32
-	(USAGE, 0x83, 0x01),         //   Usage (Media sel)   ; bit 6: 64
-	(USAGE, 0x8A, 0x01),         //   Usage (Mail)        ; bit 7: 128
-	(HIDINPUT, 0x02),            // INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-	(END_COLLECTION),            // END_COLLECTION
+	(USAGE_PAGE, 0x01), // USAGE_PAGE (Generic Desktop Ctrls)
+	(USAGE, 0x06),      // USAGE (Keyboard)
+	(COLLECTION, 0x01), // COLLECTION (Application)
+	// ------------------------------------------------- Keyboard
+	(REPORT_ID, KEYBOARD_ID), //   REPORT_ID (1)
+	(USAGE_PAGE, 0x07),       //   USAGE_PAGE (Kbrd/Keypad)
+	(USAGE_MINIMUM, 0xE0),    //   USAGE_MINIMUM (0xE0)
+	(USAGE_MAXIMUM, 0xE7),    //   USAGE_MAXIMUM (0xE7)
+	(LOGICAL_MINIMUM, 0x00),  //   LOGICAL_MINIMUM (0)
+	(LOGICAL_MAXIMUM, 0x01),  //   Logical Maximum (1)
+	(REPORT_SIZE, 0x01),      //   REPORT_SIZE (1)
+	(REPORT_COUNT, 0x08),     //   REPORT_COUNT (8)
+	(HIDINPUT, 0x02),         //   INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+	(REPORT_COUNT, 0x01),     //   REPORT_COUNT (1) ; 1 byte (Reserved)
+	(REPORT_SIZE, 0x08),      //   REPORT_SIZE (8)
+	(HIDINPUT, 0x01),         //   INPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
+	(REPORT_COUNT, 0x05),     //   REPORT_COUNT (5) ; 5 bits (Num lock, Caps lock, Scroll lock, Compose, Kana)
+	(REPORT_SIZE, 0x01),      //   REPORT_SIZE (1)
+	(USAGE_PAGE, 0x08),       //   USAGE_PAGE (LEDs)
+	(USAGE_MINIMUM, 0x01),    //   USAGE_MINIMUM (0x01) ; Num Lock
+	(USAGE_MAXIMUM, 0x05),    //   USAGE_MAXIMUM (0x05) ; Kana
+	(HIDOUTPUT, 0x02),        //   OUTPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+	(REPORT_COUNT, 0x01),     //   REPORT_COUNT (1) ; 3 bits (Padding)
+	(REPORT_SIZE, 0x03),      //   REPORT_SIZE (3)
+	(HIDOUTPUT, 0x01),        //   OUTPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+	(REPORT_COUNT, 0x06),     //   REPORT_COUNT (6) ; 6 bytes (Keys)
+	(REPORT_SIZE, 0x08),      //   REPORT_SIZE(8)
+	(LOGICAL_MINIMUM, 0x00),  //   LOGICAL_MINIMUM(0)
+	(LOGICAL_MAXIMUM, 0x65),  //   LOGICAL_MAXIMUM(0x65) ; 101 keys
+	(USAGE_PAGE, 0x07),       //   USAGE_PAGE (Kbrd/Keypad)
+	(USAGE_MINIMUM, 0x00),    //   USAGE_MINIMUM (0)
+	(USAGE_MAXIMUM, 0x65),    //   USAGE_MAXIMUM (0x65)
+	(HIDINPUT, 0x00),         //   INPUT (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
+	(END_COLLECTION),         // END_COLLECTION
+	// ------------------------------------------------- Media Keys
+	(USAGE_PAGE, 0x0C),         // USAGE_PAGE (Consumer)
+	(USAGE, 0x01),              // USAGE (Consumer Control)
+	(COLLECTION, 0x01),         // COLLECTION (Application)
+	(REPORT_ID, MEDIA_KEYS_ID), //   REPORT_ID (2)
+	(USAGE_PAGE, 0x0C),         //   USAGE_PAGE (Consumer)
+	(LOGICAL_MINIMUM, 0x00),    //   LOGICAL_MINIMUM (0)
+	(LOGICAL_MAXIMUM, 0x01),    //   LOGICAL_MAXIMUM (1)
+	(REPORT_SIZE, 0x01),        //   REPORT_SIZE (1)
+	(REPORT_COUNT, 0x10),       //   REPORT_COUNT (16)
+	(USAGE, 0xB5),              //   USAGE (Scan Next Track)     ; bit 0: 1
+	(USAGE, 0xB6),              //   USAGE (Scan Previous Track) ; bit 1: 2
+	(USAGE, 0xB7),              //   USAGE (Stop)                ; bit 2: 4
+	(USAGE, 0xCD),              //   USAGE (Play/Pause)          ; bit 3: 8
+	(USAGE, 0xE2),              //   USAGE (Mute)                ; bit 4: 16
+	(USAGE, 0xE9),              //   USAGE (Volume Increment)    ; bit 5: 32
+	(USAGE, 0xEA),              //   USAGE (Volume Decrement)    ; bit 6: 64
+	(USAGE, 0x23, 0x02),        //   Usage (WWW Home)            ; bit 7: 128
+	(USAGE, 0x94, 0x01),        //   Usage (My Computer) ; bit 0: 1
+	(USAGE, 0x92, 0x01),        //   Usage (Calculator)  ; bit 1: 2
+	(USAGE, 0x2A, 0x02),        //   Usage (WWW fav)     ; bit 2: 4
+	(USAGE, 0x21, 0x02),        //   Usage (WWW search)  ; bit 3: 8
+	(USAGE, 0x26, 0x02),        //   Usage (WWW stop)    ; bit 4: 16
+	(USAGE, 0x24, 0x02),        //   Usage (WWW back)    ; bit 5: 32
+	(USAGE, 0x83, 0x01),        //   Usage (Media sel)   ; bit 6: 64
+	(USAGE, 0x8A, 0x01),        //   Usage (Mail)        ; bit 7: 128
+	(HIDINPUT, 0x02),           // INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+	(END_COLLECTION),           // END_COLLECTION
 );
 
 #[task]
@@ -203,12 +207,7 @@ impl GattValue for PnPID {
 
 	fn to_gatt(&self) -> &[u8] {
 		// TODO: Find a safe alternative
-		unsafe {
-			core::slice::from_raw_parts(
-				self as *const Self as *const u8,
-				core::mem::size_of::<PnPID>(),
-			)
-		}
+		unsafe { core::slice::from_raw_parts(self as *const Self as *const u8, core::mem::size_of::<PnPID>()) }
 	}
 }
 
@@ -254,46 +253,56 @@ impl HIDService {
 		let hid_info = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4A),
 			Attribute::new([0x11u8, 0x1u8, 0x00u8, 0x01u8]),
-			Metadata::new(Properties::new().read()))?;
+			Metadata::new(Properties::new().read()),
+		)?;
 		let hid_info_handle = hid_info.build();
 
 		let report_map = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4B),
 			Attribute::new(REPORT_MAP),
-			Metadata::new(Properties::new().read()))?;
+			Metadata::new(Properties::new().read()),
+		)?;
 		let report_map_handle = report_map.build();
 
 		let hid_control = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4C),
 			Attribute::new([0u8]),
-			Metadata::new(Properties::new().write_without_response()))?;
+			Metadata::new(Properties::new().write_without_response()),
+		)?;
 		let hid_control_handle = hid_control.build();
 
 		let mut input_keyboard = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4D),
 			Attribute::new([0u8; 8]),
-			Metadata::new(Properties::new().read().notify()))?;
-		let _input_keyboard_desc = input_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 1u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys), second is in/out
+			Metadata::new(Properties::new().read().notify()),
+		)?;
+		let _input_keyboard_desc =
+			input_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 1u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys), second is in/out
 		let input_keyboard_handle = input_keyboard.build();
 
 		let mut output_keyboard = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4D),
 			Attribute::new([0u8; 8]),
-			Metadata::new(Properties::new().read().write().write_without_response()))?;
-		let _output_keyboard_desc = output_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 2u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys)
+			Metadata::new(Properties::new().read().write().write_without_response()),
+		)?;
+		let _output_keyboard_desc =
+			output_keyboard.add_descriptor(Uuid::new_16(0x2908), Attribute::new([KEYBOARD_ID, 2u8]))?; // First is ID (e.g. 1 for keyboard 2 for media keys)
 		let output_keyboard_handle = output_keyboard.build();
 
 		let mut input_media_keys = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4D),
 			Attribute::new([0u8; 16]),
-			Metadata::new(Properties::new().read().notify()))?;
-		let _input_media_keys_desc = input_media_keys.add_descriptor(Uuid::new_16(0x2908), Attribute::new([MEDIA_KEYS_ID, 1u8]))?;
+			Metadata::new(Properties::new().read().notify()),
+		)?;
+		let _input_media_keys_desc =
+			input_media_keys.add_descriptor(Uuid::new_16(0x2908), Attribute::new([MEDIA_KEYS_ID, 1u8]))?;
 		let input_media_keys_handle = input_media_keys.build();
 
 		let protocol_mode = service_builder.add_characteristic(
 			Uuid::new_16(0x2A4E),
 			Attribute::new([1u8]),
-			Metadata::new(Properties::new().read().write_without_response()))?;
+			Metadata::new(Properties::new().read().write_without_response()),
+		)?;
 		let protocol_mode_handle = protocol_mode.build();
 
 		let _service_handle = service_builder.build();
@@ -355,15 +364,23 @@ pub struct Server {
 
 impl Server {
 	pub fn init(&mut self) {
-		self.dis.model_number_set(&String::try_from("Launchpad").unwrap()).unwrap();
-		self.dis.serial_number_set(&String::try_from("123456").unwrap()).unwrap();
-		self.dis.manufacturer_name_set(&String::try_from("PubSubinator").unwrap()).unwrap();
-		self.dis.pnp_id_set(&PnPID {
-			vid_source: VidSource::UsbIF,
-			vendor_id: 0x05AC,
-			product_id: 0x820A,
-			product_version: 0x0100,
-		}).unwrap();
+		self.dis
+			.model_number_set(&String::try_from("Launchpad").unwrap())
+			.unwrap();
+		self.dis
+			.serial_number_set(&String::try_from("123456").unwrap())
+			.unwrap();
+		self.dis
+			.manufacturer_name_set(&String::try_from("PubSubinator").unwrap())
+			.unwrap();
+		self.dis
+			.pnp_id_set(&PnPID {
+				vid_source: VidSource::UsbIF,
+				vendor_id: 0x05AC,
+				product_id: 0x820A,
+				product_version: 0x0100,
+			})
+			.unwrap();
 
 		self.bas.battery_level_set(&66).unwrap();
 	}
@@ -372,7 +389,8 @@ impl Server {
 pub struct BleHid<'a> {
 	pub softdevice: &'a Softdevice,
 	pub server: &'a Server,
-	pub channel: Subscriber<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
+	pub channel:
+		Subscriber<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 	pub security_handler: &'static Bonder,
 }
 
@@ -380,24 +398,36 @@ impl<'a> BleHid<'a> {
 	pub async fn connect(sd: &'a Softdevice, security_handler: &'static dyn SecurityHandler) -> Connection {
 		let adv_data = LegacyAdvertisementBuilder::new()
 			.flags(&[Flag::GeneralDiscovery, Flag::LE_Only])
-			.services_16(ServiceList::Incomplete, &[ServiceUuid16::BATTERY, ServiceUuid16::HUMAN_INTERFACE_DEVICE])
+			.services_16(
+				ServiceList::Incomplete,
+				&[ServiceUuid16::BATTERY, ServiceUuid16::HUMAN_INTERFACE_DEVICE],
+			)
 			.full_name("PubSubinator")
 			.raw(AdvertisementDataType::APPEARANCE, &[0xC1, 0x03])
 			.build();
 
 		let scan_data = LegacyAdvertisementBuilder::new()
-			.services_16(ServiceList::Complete, &[ServiceUuid16::BATTERY, ServiceUuid16::DEVICE_INFORMATION, ServiceUuid16::HUMAN_INTERFACE_DEVICE])
+			.services_16(
+				ServiceList::Complete,
+				&[
+					ServiceUuid16::BATTERY,
+					ServiceUuid16::DEVICE_INFORMATION,
+					ServiceUuid16::HUMAN_INTERFACE_DEVICE,
+				],
+			)
 			.build();
 
 		let config = peripheral::Config::default();
 		let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
 			adv_data: &adv_data,
-			scan_data: &scan_data
+			scan_data: &scan_data,
 		};
 
 		info!("advertising...");
 
-		let conn = peripheral::advertise_pairable(sd, adv, &config, security_handler).await.unwrap();
+		let conn = peripheral::advertise_pairable(sd, adv, &config, security_handler)
+			.await
+			.unwrap();
 		info!("Updating active connection handle");
 
 		info!("advertising done!");
@@ -406,11 +436,11 @@ impl<'a> BleHid<'a> {
 	}
 
 	// pub async fn run(&self, conn: &Connection) {
-		// Run the GATT server on the connection. This returns when the connection gets disconnected.
-		//
-		// Event enums (ServerEvent's) are generated by nrf_softdevice::gatt_server
-		// proc macro when applied to the Server struct above
-		// gatt_server::run(conn, &self.server, |_| {}).await;
+	// Run the GATT server on the connection. This returns when the connection gets disconnected.
+	//
+	// Event enums (ServerEvent's) are generated by nrf_softdevice::gatt_server
+	// proc macro when applied to the Server struct above
+	// gatt_server::run(conn, &self.server, |_| {}).await;
 	// }
 }
 
@@ -424,7 +454,14 @@ impl<'a> RSubscriber for BleHid<'a> {
 						reserved: 0,
 						leds: 0,
 						// TODO: Make this a generic
-						keycodes: [keycodes[0].into(), keycodes[1].into(), keycodes[2].into(), keycodes[3].into(), keycodes[4].into(), keycodes[5].into()],
+						keycodes: [
+							keycodes[0].into(),
+							keycodes[1].into(),
+							keycodes[2].into(),
+							keycodes[3].into(),
+							keycodes[4].into(),
+							keycodes[5].into(),
+						],
 					};
 
 					self.server.hid.send_report(&report).await;
@@ -481,11 +518,21 @@ impl SecurityHandler for Bonder {
 	// 	info!("recv_out_of_band");
 	// }
 
-	fn on_security_update(&self, _conn: &nrf_softdevice::ble::Connection, security_mode: nrf_softdevice::ble::SecurityMode) {
+	fn on_security_update(
+		&self,
+		_conn: &nrf_softdevice::ble::Connection,
+		security_mode: nrf_softdevice::ble::SecurityMode,
+	) {
 		info!("on_security_update {:?}", security_mode);
 	}
 
-	fn on_bonded(&self, _conn: &nrf_softdevice::ble::Connection, master_id: nrf_softdevice::ble::MasterId, key: nrf_softdevice::ble::EncryptionInfo, peer_id: nrf_softdevice::ble::IdentityKey) {
+	fn on_bonded(
+		&self,
+		_conn: &nrf_softdevice::ble::Connection,
+		master_id: nrf_softdevice::ble::MasterId,
+		key: nrf_softdevice::ble::EncryptionInfo,
+		peer_id: nrf_softdevice::ble::IdentityKey,
+	) {
 		info!("on_bonded");
 
 		// In a real application you would want to signal another task to permanently store the keys in non-volatile memory here.

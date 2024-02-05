@@ -3,23 +3,24 @@ use core::future::Future;
 use core::pin::Pin;
 use defmt::*;
 
-use embassy_nrf::saadc::{Saadc, Gain, Reference, Resistor, Time};
+use embassy_nrf::saadc::{Gain, Reference, Resistor, Saadc, Time};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 
 // TODO: Use a generics instead of nrf-specifics
-use embassy_nrf::Peripheral;
-use embassy_nrf::saadc::Input;
 use embassy_nrf::peripherals::SAADC;
+use embassy_nrf::saadc::Input;
+use embassy_nrf::Peripheral;
 
+use crate::{Irqs, PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 use reactor::reactor_event::*;
 use reactor::{Polled, RPublisher};
-use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS, Irqs};
 
 pub struct Analog<'a, const N: usize> {
 	input: Saadc<'a, N>,
 	last_state: [i16; N],
-	channel: Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
+	channel:
+		Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 }
 
 impl<'a, const N: usize> Analog<'a, N> {
@@ -73,12 +74,13 @@ impl<'a> Polled for Analog<'a, 1> {
 	}
 }
 
-
 impl<'a> Polled for Analog<'a, 2> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async {
 			if let Some(buf) = self._poll_internal().await {
-				self.channel.publish(ReactorEvent::Joystick { x: buf[0], y: buf[1] }).await;
+				self.channel
+					.publish(ReactorEvent::Joystick { x: buf[0], y: buf[1] })
+					.await;
 			}
 		})
 	}
@@ -88,7 +90,13 @@ impl<'a> Polled for Analog<'a, 3> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async {
 			if let Some(buf) = self._poll_internal().await {
-				self.channel.publish(ReactorEvent::FullJoystick { x: buf[0], y: buf[1], z: buf[2] }).await;
+				self.channel
+					.publish(ReactorEvent::FullJoystick {
+						x: buf[0],
+						y: buf[1],
+						z: buf[2],
+					})
+					.await;
 			}
 		})
 	}
@@ -98,7 +106,16 @@ impl<'a> Polled for Analog<'a, 6> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async {
 			if let Some(buf) = self._poll_internal().await {
-				self.channel.publish(ReactorEvent::SpaceMouse { x: buf[0], y: buf[1], z: buf[2], a: buf[3], b: buf[4], c: buf[5] }).await;
+				self.channel
+					.publish(ReactorEvent::SpaceMouse {
+						x: buf[0],
+						y: buf[1],
+						z: buf[2],
+						a: buf[3],
+						b: buf[4],
+						c: buf[5],
+					})
+					.await;
 			}
 		})
 	}

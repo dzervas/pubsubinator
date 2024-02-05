@@ -1,12 +1,13 @@
 use core::convert::Infallible;
 use core::pin::Pin;
 
-use alloc::{vec::Vec, boxed::Box};
+use crate::{PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 use embedded_hal::digital::{InputPin, OutputPin};
 use futures::Future;
-use crate::{PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 use reactor::reactor_event::*;
 use reactor::{Polled, RPublisher};
 
@@ -29,7 +30,8 @@ pub struct Matrix<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usiz
 	outputs: [O; OC],
 	last_state: [[bool; OC]; IC],
 	direction: MatrixDirection,
-	channel: Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
+	channel:
+		Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 }
 
 impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Matrix<'a, I, O, IC, OC> {
@@ -41,7 +43,7 @@ impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Matrix<'a,
 			outputs,
 			last_state,
 			direction,
-			channel: crate::CHANNEL.publisher().unwrap()
+			channel: crate::CHANNEL.publisher().unwrap(),
 		}
 	}
 

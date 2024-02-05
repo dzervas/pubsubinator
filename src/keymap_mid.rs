@@ -6,9 +6,9 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 use futures::Future;
 
+use crate::{CHANNEL, PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 use reactor::middleware::Middleware;
 use reactor::reactor_event::*;
-use crate::{CHANNEL, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS};
 
 pub const KEYMAP_PERIOD: u64 = 2;
 
@@ -17,7 +17,14 @@ pub struct Keymap<const R: usize, const C: usize, const L: usize> {
 	pub hold_cycles: u16,
 	layer: usize,
 	last_state: [[(KeyEvent, u8); C]; R],
-	channel: Publisher<'static, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>
+	channel: Publisher<
+		'static,
+		CriticalSectionRawMutex,
+		ReactorEvent,
+		PUBSUB_CAPACITY,
+		PUBSUB_SUBSCRIBERS,
+		PUBSUB_PUBLISHERS,
+	>,
 }
 
 impl<const R: usize, const C: usize, const L: usize> Keymap<R, C, L> {
@@ -29,7 +36,7 @@ impl<const R: usize, const C: usize, const L: usize> Keymap<R, C, L> {
 			hold_cycles,
 			last_state,
 			layer: 0,
-			channel: CHANNEL.publisher().unwrap()
+			channel: CHANNEL.publisher().unwrap(),
 		}
 	}
 }
@@ -55,20 +62,19 @@ impl<const R: usize, const C: usize, const L: usize> Middleware for Keymap<R, C,
 							self.layer = 0;
 						}
 					},
-					InternalEvent::LayerPrev => {
+					InternalEvent::LayerPrev =>
 						if self.layer == 0 {
 							self.layer = L - 1;
 						} else {
 							self.layer -= 1;
-						}
-					},
+						},
 					InternalEvent::LayerChange(target) => {
 						self.layer = target;
 						if self.layer >= L {
 							self.layer = 0;
 						}
 					},
-					_ => {}
+					_ => {},
 				}
 
 				if old_layer != self.layer {
@@ -84,18 +90,16 @@ impl<const R: usize, const C: usize, const L: usize> Middleware for Keymap<R, C,
 				}
 			} else if let KeyCodeInt::Key(key) = active_keymap[rindex][cindex] {
 				match self.last_state[rindex][cindex].0 {
-					KeyEvent::Released(code) => {
+					KeyEvent::Released(code) =>
 						if value {
 							info!("Got a pressed event: {:?}", &code);
 							new_state = KeyEvent::Pressed(key.clone());
-						}
-					},
-					KeyEvent::Pressed(code) => {
+						},
+					KeyEvent::Pressed(code) =>
 						if !value {
 							info!("Got a released event: {:?}", &code);
 							new_state = KeyEvent::Released(key.clone())
-						}
-					},
+						},
 				};
 			}
 

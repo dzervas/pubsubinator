@@ -4,18 +4,17 @@ use core::pin::Pin;
 use alloc::boxed::Box;
 use defmt::*;
 use embassy_nrf::usb::vbus_detect::VbusDetect;
-use embassy_usb::Builder;
-use embassy_usb::control::OutResponse;
 use embassy_usb::class::hid::{HidWriter, ReportId, RequestHandler, State};
+use embassy_usb::control::OutResponse;
+use embassy_usb::Builder;
 use futures::Future;
 use static_cell::make_static;
-use usbd_hid::descriptor::KeyboardReport;
-use usbd_hid::descriptor::SerializedDescriptor;
+use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
 
-use reactor::RSubscriber;
-use reactor::reactor_event::*;
 use crate::nrf::UsbDriver;
 use crate::VBUS_DETECT;
+use reactor::reactor_event::*;
+use reactor::RSubscriber;
 
 pub struct UsbHid {
 	writer: Option<HidWriter<'static, UsbDriver, 8>>,
@@ -38,9 +37,7 @@ impl UsbHid {
 		let state = make_static!(State::new());
 		let writer = HidWriter::<_, 8>::new(builder, state, hid_config);
 
-		Self {
-			writer: Some(writer),
-		}
+		Self { writer: Some(writer) }
 	}
 }
 
@@ -51,7 +48,8 @@ impl RSubscriber for UsbHid {
 			// ReactorEvent::Locks { caps, num, scroll } => true,
 			// ReactorEvent::Mouse { x, y } => true,
 			_ => false,
-		}) && self.writer.is_some() && VBUS_DETECT.deref().is_usb_detected()
+		}) && self.writer.is_some()
+			&& VBUS_DETECT.deref().is_usb_detected()
 	}
 
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
@@ -63,7 +61,14 @@ impl RSubscriber for UsbHid {
 						reserved: 0,
 						leds: 0,
 						// TODO: Make this a generic
-						keycodes: [keycodes[0].into(), keycodes[1].into(), keycodes[2].into(), keycodes[3].into(), keycodes[4].into(), keycodes[5].into()],
+						keycodes: [
+							keycodes[0].into(),
+							keycodes[1].into(),
+							keycodes[2].into(),
+							keycodes[3].into(),
+							keycodes[4].into(),
+							keycodes[5].into(),
+						],
 					};
 
 					// self.writer.as_mut().unwrap().ready().await;
