@@ -372,7 +372,6 @@ impl Server {
 pub struct BleHid<'a> {
 	pub softdevice: &'a Softdevice,
 	pub server: &'a Server,
-	pub report: KeyboardReport,
 	pub channel: Subscriber<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 	pub security_handler: &'static Bonder,
 }
@@ -419,45 +418,19 @@ impl<'a> RSubscriber for BleHid<'a> {
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async move {
 			match value {
-				ReactorEvent::Key(code) => {
-					match code {
-						KeyEvent::Pressed(key) => {
-							info!("Pressed: {:?}", key);
-							if key > KeyCode::LCtrl && key < KeyCode::RGui {
-								self.report.modifier |= 1 << (key as u8 - KeyCode::LCtrl as u8);
-							} else if !self.report.keycodes.contains(&(key as u8)) {
-								if let Some(pos) = self.report.keycodes.iter().position(|&k| k == KeyCode::None as u8) {
-									self.report.keycodes[pos] = key as u8;
-								}
-							}
-						},
-						KeyEvent::Released(key) => {
-							info!("Released: {:?}", key);
-							if key > KeyCode::LCtrl && key < KeyCode::RGui {
-								self.report.modifier &= 0 << (key as u8 - KeyCode::LCtrl as u8);
-							} else if let Some(pos) = self.report.keycodes.iter().position(|&k| k == key as u8) {
-								self.report.keycodes[pos] = 0;
-							}
-						},
-						// _ => {
-						// 	info!("Unhandled event: {:?}", value);
-						// },
-					}
-				},
-				// ReactorEvent::Locks { caps, num, scroll } => {
-				// 	self.report.modifier = 0;
-				// 	self.report.keycodes[0] = caps as u8;
-				// },
-				// ReactorEvent::Mouse { x, y } => {
-				// 	info!("Unhandled event: {:?}", value);
-				// },
-				_ => {
-					info!("Unhandled event: {:?}", value);
-					return;
-				},
-			}
+				ReactorEvent::KeyboardReport { modifier, keycodes } => {
+					let report = KeyboardReport {
+						modifier: modifier.into(),
+						reserved: 0,
+						leds: 0,
+						// TODO: Make this a generic
+						keycodes: [keycodes[0].into(), keycodes[1].into(), keycodes[2].into(), keycodes[3].into(), keycodes[4].into(), keycodes[5].into()],
+					};
 
-			self.server.hid.send_report(&self.report).await;
+					self.server.hid.send_report(&report).await;
+				},
+				_ => {},
+			}
 		})
 	}
 }

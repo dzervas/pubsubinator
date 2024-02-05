@@ -25,6 +25,7 @@ pub enum ReactorEvent {
 	// Keyboard
 	Key(KeyEvent),
 	Locks { caps: bool, num: bool, scroll: bool },
+	KeyboardReport { modifier: KeyModifiers, keycodes: [KeyCode; 6] },
 
 	// Mouse
 	// TODO: Handle the mouse wheel
@@ -305,8 +306,85 @@ pub enum KeyCode {
 	MediaCalc, // 0xFB
 }
 
+impl Default for KeyCode {
+	fn default() -> Self {
+		Self::None
+	}
+}
+
+impl Into<u8> for KeyCode {
+	fn into(self) -> u8 {
+		self as u8
+	}
+}
+
+impl From<u8> for KeyCode {
+	fn from(value: u8) -> Self {
+		if value > 0xFB {
+			Self::None
+		} else {
+			unsafe { core::mem::transmute(value) }
+		}
+	}
+}
+
 pub enum KeyCodeInt {
 	None,
 	Key(KeyCode),
 	Internal(InternalEvent),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
+pub struct KeyModifiers {
+	pub lctrl: bool,
+	pub lshift: bool,
+	pub lalt: bool,
+	pub lgui: bool,
+	pub rctrl: bool,
+	pub rshift: bool,
+	pub ralt: bool,
+	pub rgui: bool,
+}
+
+impl Default for KeyModifiers {
+	fn default() -> Self {
+		Self {
+			lctrl: false,
+			lshift: false,
+			lalt: false,
+			lgui: false,
+			rctrl: false,
+			rshift: false,
+			ralt: false,
+			rgui: false,
+		}
+	}
+}
+
+impl Into<u8> for KeyModifiers {
+	fn into(self) -> u8 {
+		(self.lctrl as u8) << 0 |
+		(self.lshift as u8) << 1 |
+		(self.lalt as u8) << 2 |
+		(self.lgui as u8) << 3 |
+		(self.rctrl as u8) << 4 |
+		(self.rshift as u8) << 5 |
+		(self.ralt as u8) << 6 |
+		(self.rgui as u8) << 7
+	}
+}
+
+impl From<u8> for KeyModifiers {
+	fn from(value: u8) -> Self {
+		Self {
+			lctrl: value & 1 << 0 != 0,
+			lshift: value & 1 << 1 != 0,
+			lalt: value & 1 << 2 != 0,
+			lgui: value & 1 << 3 != 0,
+			rctrl: value & 1 << 4 != 0,
+			rshift: value & 1 << 5 != 0,
+			ralt: value & 1 << 6 != 0,
+			rgui: value & 1 << 7 != 0,
+		}
+	}
 }

@@ -50,16 +50,13 @@ use nrf_softdevice::SocEvent;
 use nrf_softdevice::Softdevice;
 use embassy_nrf::{bind_interrupts, peripherals, usb, saadc};
 
-// BLE HID
-// TODO: Use the generic HID report
-use usbd_hid::descriptor::KeyboardReport;
-
 pub mod matrix;
 pub mod analog_nrf;
 pub mod usb_hid;
 pub mod ble_hid;
 pub mod nrf;
 pub mod keymap_mid;
+pub mod keyboard_report_mid;
 
 #[allow(unused_imports)]
 use crate::analog_nrf::Analog;
@@ -117,7 +114,7 @@ async fn main(spawner: Spawner) {
 	let p = embassy_nrf::init(config);
 	info!("Before heap init");
 
-	// -- Setup Matrix publisher --
+	// --- Setup Matrix publisher ---
 
 	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>, _, _> = make_static!(matrix::Matrix::new(
 		[
@@ -135,7 +132,7 @@ async fn main(spawner: Spawner) {
 	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");
 
-	// -- Setup Keymap middleware --
+	// --- Setup Keymap middleware ---
 	let keymap = make_static!(keymap_mid::Keymap::new(
 		[[
 			[Key(KeyCode::Kb1), Key(KeyCode::Kb2), Key(KeyCode::Kb3)],
@@ -151,7 +148,10 @@ async fn main(spawner: Spawner) {
 	));
 	info!("Keymap middleware initialized");
 
-	// -- Setup Analog publisher --
+	// --- Setup Keyboard Report middleware ---
+	let keyboard_report = make_static!(keyboard_report_mid::KeyboardReportMid::default());
+
+	// --- Setup Analog publisher ---
 
 	// let analog = make_static!(Analog::new(p.SAADC, [
 	// 	Into::<saadc::AnyInput>::into(p.P0_03),
@@ -159,14 +159,14 @@ async fn main(spawner: Spawner) {
 	// ]));
 	// spawner.spawn(poller_task(analog)).unwrap();
 
-	// -- Setup USB HID consumer --
+	// --- Setup USB HID consumer ---
 	let mut usb_builder = usb_init(p.USBD);
 	let usb_hid = make_static!(UsbHid::new(&mut usb_builder));
 
 	spawner.spawn(usb_task(usb_builder)).unwrap();
 	info!("USB HID consumer initialized");
 
-	// -- Setup SoftDevice --
+	// --- Setup SoftDevice ---
 	info!("Starting SoftDevice BLE shit");
 
 	let sd_config = nrf_softdevice::Config {
@@ -211,16 +211,10 @@ async fn main(spawner: Spawner) {
 	let server = make_static!(ble_hid::Server::new(sd).unwrap());
 	server.init();
 
-	// -- Setup BLE HID consumer --
+	// --- Setup BLE HID consumer ---
 	let ble_hid = make_static!(BleHid {
 		softdevice: sd,
 		server,
-		report: KeyboardReport {
-			modifier: 0,
-			reserved: 0,
-			leds: 0,
-			keycodes: [0; 6],
-		},
 		security_handler: make_static!(ble_hid::Bonder::default()),
 		channel: CHANNEL.subscriber().unwrap(),
 	});
@@ -230,7 +224,7 @@ async fn main(spawner: Spawner) {
 
 	spawner.spawn(ble_hid_task(sd, server)).unwrap();
 
-	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [ble_hid, usb_hid, keymap]);
+	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [ble_hid, usb_hid], [keymap, keyboard_report]);
 	spawner.spawn(subs_task).unwrap();
 }
 

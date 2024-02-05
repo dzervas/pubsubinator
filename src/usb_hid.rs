@@ -2,7 +2,7 @@ use core::ops::Deref;
 use core::pin::Pin;
 
 use alloc::boxed::Box;
-use defmt::{debug, info, warn};
+use defmt::*;
 use embassy_nrf::usb::vbus_detect::VbusDetect;
 use embassy_usb::Builder;
 use embassy_usb::control::OutResponse;
@@ -19,7 +19,6 @@ use crate::VBUS_DETECT;
 
 pub struct UsbHid {
 	writer: Option<HidWriter<'static, UsbDriver, 8>>,
-	report: KeyboardReport,
 }
 
 impl UsbHid {
@@ -41,12 +40,6 @@ impl UsbHid {
 
 		Self {
 			writer: Some(writer),
-			report: KeyboardReport {
-				modifier: 0,
-				reserved: 0,
-				leds: 0,
-				keycodes: [0; 6],
-			},
 		}
 	}
 }
@@ -62,59 +55,24 @@ impl RSubscriber for UsbHid {
 	}
 
 	fn push(&mut self, value: ReactorEvent) -> Pin<Box<dyn Future<Output = ()> + '_>> {
-		if self.writer.is_none() || !VBUS_DETECT.deref().is_usb_detected() {
-			debug!("USB HID writer is none or USB is not detected, skipping event.");
-			return Box::pin(async {
-				()
-			});
-		}
-
-		info!("VBUS status: {:?}", VBUS_DETECT.deref().is_usb_detected());
-
 		Box::pin(async move {
 			match value {
-				ReactorEvent::Key(code) => {
-					match code {
-						KeyEvent::Pressed(key) => {
-							info!("Pressed: {:?}", key);
-							if key > KeyCode::LCtrl && key < KeyCode::RGui {
-								self.report.modifier |= 1 << (key as u8 - KeyCode::LCtrl as u8);
-							} else if !self.report.keycodes.contains(&(key as u8)) {
-								if let Some(pos) = self.report.keycodes.iter().position(|&k| k == KeyCode::None as u8) {
-									self.report.keycodes[pos] = key as u8;
-								}
-							}
-						},
-						KeyEvent::Released(key) => {
-							info!("Released: {:?}", key);
-							if key > KeyCode::LCtrl && key < KeyCode::RGui {
-								self.report.modifier &= 0 << (key as u8 - KeyCode::LCtrl as u8);
-							} else if let Some(pos) = self.report.keycodes.iter().position(|&k| k == key as u8) {
-								self.report.keycodes[pos] = 0;
-							}
-						},
-						// _ => {
-						// 	info!("Unhandled event: {:?}", value);
-						// },
+				ReactorEvent::KeyboardReport { modifier, keycodes } => {
+					let report = KeyboardReport {
+						modifier: modifier.into(),
+						reserved: 0,
+						leds: 0,
+						// TODO: Make this a generic
+						keycodes: [keycodes[0].into(), keycodes[1].into(), keycodes[2].into(), keycodes[3].into(), keycodes[4].into(), keycodes[5].into()],
+					};
+
+					// self.writer.as_mut().unwrap().ready().await;
+					match self.writer.as_mut().unwrap().write_serialize(&report).await {
+						Ok(_) => {},
+						Err(e) => warn!("Error writing to USB HID: {:?}", e),
 					}
 				},
-				// ReactorEvent::Locks { caps, num, scroll } => {
-				// 	self.report.modifier = 0;
-				// 	self.report.keycodes[0] = caps as u8;
-				// },
-				// ReactorEvent::Mouse { x, y } => {
-				// 	info!("Unhandled event: {:?}", value);
-				// },
-				_ => {
-					info!("Unhandled event: {:?}", value);
-					return;
-				},
-			}
-
-			// self.writer.as_mut().unwrap().ready().await;
-			match self.writer.as_mut().unwrap().write_serialize(&self.report).await {
-				Ok(_) => {},
-				Err(e) => warn!("Error writing to USB HID: {:?}", e),
+				_ => {},
 			}
 		})
 	}
