@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::str::FromStr;
 use reactor::*;
 
-use crate::{gpio::{Drive, Input, Level, Output, Pin, Pull}, keymap_mid::*, matrix::{InputObj, Matrix, MatrixDirection, OutputObj}};
+use crate::{gpio::{Drive, Input, Level, Output, Pin, Pull}, keymap_mid::*, matrix::{Matrix, MatrixDirection}};
 
 #[derive(Debug, Default)]
 pub struct KeymapConfig {
@@ -57,7 +57,7 @@ impl<'a> Into<Input<'a>> for &MatrixConfigInputsType {
 	fn into(self) -> Input<'a> {
 		let pin = Pin::from_str(self.pin).unwrap();
 		let pull = Pull::from_str(self.pull).unwrap();
-		Input::new(pin, pull.into())
+		unsafe { pin.to_input(pull) }
 	}
 }
 
@@ -73,6 +73,6 @@ impl<'a> Into<Output<'a>> for &MatrixConfigOutputsType {
 		let pin = Pin::from_str(self.pin).unwrap();
 		let drive = Drive::from_str(self.drive).unwrap();
 		let level = Level::from_str(self.level).unwrap();
-		Output::new(pin, level.into(), drive.into())
+		unsafe { pin.to_output(drive, level) }
 	}
 }

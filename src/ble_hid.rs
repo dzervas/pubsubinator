@@ -27,9 +27,19 @@ use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
 
-use crate::{hid, PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
+use crate::{PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 use reactor::reactor_event::*;
 use reactor::RSubscriber;
+
+#[allow(unused_macros)]
+macro_rules! count {
+	() => { 0u8 };
+	($x:tt $($xs:tt)*) => {1u8 + count!($($xs)*)};
+}
+
+macro_rules! hid {
+	($(( $($xs:tt),*)),+ $(,)?) => { &[ $( (count!($($xs)*)-1) | $($xs),* ),* ] };
+}
 
 // Main items
 pub const HIDINPUT: u8 = 0x80;

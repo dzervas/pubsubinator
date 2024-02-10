@@ -1,19 +1,6 @@
 #![no_std]
 #![no_main]
-#![feature(generic_arg_infer)]
-#![feature(trait_alias)]
 #![feature(type_alias_impl_trait)]
-#![feature(decl_macro)]
-
-#[allow(unused_macros)]
-macro count {
-	() => { 0u8 },
-	($x:tt $($xs:tt)*) => {1u8 + count!($($xs)*)}
-}
-
-pub macro hid {
-	($(( $($xs:tt),*)),+ $(,)?) => { &[ $( (count!($($xs)*)-1) | $($xs),* ),* ] }
-}
 
 extern crate alloc;
 extern crate defmt_rtt;
@@ -38,6 +25,7 @@ use static_cell::make_static;
 
 use embedded_alloc::Heap;
 
+// TODO: Get rid of allocations
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
@@ -115,24 +103,8 @@ async fn main(spawner: Spawner) {
 	config.gpiote_interrupt_priority = Priority::P2;
 	config.time_interrupt_priority = Priority::P2;
 	let p = embassy_nrf::init(config);
-	info!("Before heap init");
 
 	// --- Setup Matrix publisher ---
-
-	// let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>, _, _> =
-	// 	make_static!(matrix::Matrix::new(
-	// 		[
-	// 			Input::new(p.P0_04.degrade(), Pull::Down),
-	// 			Input::new(p.P0_30.degrade(), Pull::Down),
-	// 			Input::new(p.P1_14.degrade(), Pull::Down),
-	// 		],
-	// 		[
-	// 			Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 			Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 			Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 		],
-	// 		matrix::MatrixDirection::Row2Col,
-	// 	));
 	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>> = make_static!(config::MATRIX.build());
 	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");

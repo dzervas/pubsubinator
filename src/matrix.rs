@@ -22,11 +22,8 @@ pub enum MatrixDirection {
 	Row2Col,
 }
 
-pub trait InputObj = InputPin<Error = Infallible>;
-pub trait OutputObj = OutputPin<Error = Infallible>;
-
 // TODO: Dynamic size
-pub struct Matrix<'a, I: InputObj, O: OutputObj> {
+pub struct Matrix<'a, I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> {
 	// TODO: Use slices instead of vectors
 	// TODO: Make these private and create platform-specific constructors
 	inputs: Vec<I>,
@@ -37,7 +34,7 @@ pub struct Matrix<'a, I: InputObj, O: OutputObj> {
 		Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 }
 
-impl<'a, I: InputObj, O: OutputObj> Matrix<'a, I, O> {
+impl<'a, I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Matrix<'a, I, O> {
 	pub fn new(inputs: Vec<I>, outputs: Vec<O>, direction: MatrixDirection) -> Self {
 		let last_state = vec![vec![false; inputs.len()]; outputs.len()];
 
@@ -63,9 +60,9 @@ impl<'a, I: InputObj, O: OutputObj> Matrix<'a, I, O> {
 	}
 }
 
-impl<'a, I: InputObj, O: OutputObj> RPublisher for Matrix<'a, I, O> {}
+impl<'a, I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> RPublisher for Matrix<'a, I, O> {}
 
-impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
+impl<'a, I: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Polled for Matrix<'a, I, O> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async move {
 			let mut event_buffer = Vec::new();

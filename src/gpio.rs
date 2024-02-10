@@ -1,5 +1,3 @@
-use core::ops::{Deref, DerefMut};
-
 use strum::EnumString;
 
 #[cfg(feature = "nrf")]
@@ -110,6 +108,7 @@ impl From<embassy_nrf::gpio::OutputDrive> for Drive {
 		match drive {
 			embassy_nrf::gpio::OutputDrive::Standard => Self::Standard,
 			embassy_nrf::gpio::OutputDrive::HighDrive => Self::High,
+			_ => unreachable!(),
 		}
 	}
 }
@@ -124,8 +123,40 @@ impl From<Drive> for embassy_nrf::gpio::OutputDrive {
 	}
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumString)]
-pub enum Pin {
+macro_rules! generate_pin_enum {
+	($base:path, $($name:ident),* $(,)?) => {
+		#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumString)]
+		pub enum Pin {
+			$($name,)*
+		}
+
+		#[cfg(feature = "nrf")]
+		impl Pin {
+			pub unsafe fn to_input(self, pull: Pull) -> Input<'static> {
+				use embassy_nrf::gpio::Pin;
+				match self {
+					$(
+						Self::$name => embassy_nrf::gpio::Input::new(embassy_nrf::peripherals::$name::steal().degrade(), pull.into()),
+					)*
+				}
+			}
+
+			pub unsafe fn to_output(self, drive: Drive, level: Level) -> Output<'static> {
+				use embassy_nrf::gpio::Pin;
+				match self {
+					$(
+						Self::$name => embassy_nrf::gpio::Output::new(embassy_nrf::peripherals::$name::steal().degrade(), level.into(), drive.into()),
+					)*
+				}
+			}
+		}
+	};
+}
+
+// TODO: Define board specific aliases (arduino, feather, etc)
+#[cfg(feature = "nrf")]
+generate_pin_enum!(
+	embassy_nrf::peripherals,
 	P0_00,
 	P0_01,
 	P0_02,
@@ -135,8 +166,8 @@ pub enum Pin {
 	P0_06,
 	P0_07,
 	P0_08,
-	P0_09,
-	P0_10,
+	// P0_09,
+	// P0_10,
 	P0_11,
 	P0_12,
 	P0_13,
@@ -144,7 +175,7 @@ pub enum Pin {
 	P0_15,
 	P0_16,
 	P0_17,
-	P0_18,
+	// P0_18,
 	P0_19,
 	P0_20,
 	P0_21,
@@ -174,168 +205,4 @@ pub enum Pin {
 	P1_13,
 	P1_14,
 	P1_15,
-	P1_16,
-	P1_17,
-	P1_18,
-	P1_19,
-	P1_20,
-	P1_21,
-	P1_22,
-	P1_23,
-	P1_24,
-	P1_25,
-	P1_26,
-	P1_27,
-	P1_28,
-	P1_29,
-	P1_30,
-	P1_31,
-}
-
-// TODO: There's no way this can't be done with a macro or something
-// TODO: Define board specific aliases (arduino, feather, etc)
-// #[cfg(feature = "nrf")]
-// impl From<embassy_nrf::gpio::AnyPin> for Pin {
-// 	fn from(pin: embassy_nrf::gpio::AnyPin) -> Self {
-// 		match pin {
-// 			embassy_nrf::gpio::AnyPin::P0_00 => Self::P0_00,
-// 			embassy_nrf::gpio::AnyPin::P0_01 => Self::P0_01,
-// 			embassy_nrf::gpio::AnyPin::P0_02 => Self::P0_02,
-// 			embassy_nrf::gpio::AnyPin::P0_03 => Self::P0_03,
-// 			embassy_nrf::gpio::AnyPin::P0_04 => Self::P0_04,
-// 			embassy_nrf::gpio::AnyPin::P0_05 => Self::P0_05,
-// 			embassy_nrf::gpio::AnyPin::P0_06 => Self::P0_06,
-// 			embassy_nrf::gpio::AnyPin::P0_07 => Self::P0_07,
-// 			embassy_nrf::gpio::AnyPin::P0_08 => Self::P0_08,
-// 			embassy_nrf::gpio::AnyPin::P0_09 => Self::P0_09,
-// 			embassy_nrf::gpio::AnyPin::P0_10 => Self::P0_10,
-// 			embassy_nrf::gpio::AnyPin::P0_11 => Self::P0_11,
-// 			embassy_nrf::gpio::AnyPin::P0_12 => Self::P0_12,
-// 			embassy_nrf::gpio::AnyPin::P0_13 => Self::P0_13,
-// 			embassy_nrf::gpio::AnyPin::P0_14 => Self::P0_14,
-// 			embassy_nrf::gpio::AnyPin::P0_15 => Self::P0_15,
-// 			embassy_nrf::gpio::AnyPin::P0_16 => Self::P0_16,
-// 			embassy_nrf::gpio::AnyPin::P0_17 => Self::P0_17,
-// 			embassy_nrf::gpio::AnyPin::P0_18 => Self::P0_18,
-// 			embassy_nrf::gpio::AnyPin::P0_19 => Self::P0_19,
-// 			embassy_nrf::gpio::AnyPin::P0_20 => Self::P0_20,
-// 			embassy_nrf::gpio::AnyPin::P0_21 => Self::P0_21,
-// 			embassy_nrf::gpio::AnyPin::P0_22 => Self::P0_22,
-// 			embassy_nrf::gpio::AnyPin::P0_23 => Self::P0_23,
-// 			embassy_nrf::gpio::AnyPin::P0_24 => Self::P0_24,
-// 			embassy_nrf::gpio::AnyPin::P0_25 => Self::P0_25,
-// 			embassy_nrf::gpio::AnyPin::P0_26 => Self::P0_26,
-// 			embassy_nrf::gpio::AnyPin::P0_27 => Self::P0_27,
-// 			embassy_nrf::gpio::AnyPin::P0_28 => Self::P0_28,
-// 			embassy_nrf::gpio::AnyPin::P0_29 => Self::P0_29,
-// 			embassy_nrf::gpio::AnyPin::P0_30 => Self::P0_30,
-// 			embassy_nrf::gpio::AnyPin::P0_31 => Self::P0_31,
-// 			embassy_nrf::gpio::AnyPin::P1_00 => Self::P1_00,
-// 			embassy_nrf::gpio::AnyPin::P1_01 => Self::P1_01,
-// 			embassy_nrf::gpio::AnyPin::P1_02 => Self::P1_02,
-// 			embassy_nrf::gpio::AnyPin::P1_03 => Self::P1_03,
-// 			embassy_nrf::gpio::AnyPin::P1_04 => Self::P1_04,
-// 			embassy_nrf::gpio::AnyPin::P1_05 => Self::P1_05,
-// 			embassy_nrf::gpio::AnyPin::P1_06 => Self::P1_06,
-// 			embassy_nrf::gpio::AnyPin::P1_07 => Self::P1_07,
-// 			embassy_nrf::gpio::AnyPin::P1_08 => Self::P1_08,
-// 			embassy_nrf::gpio::AnyPin::P1_09 => Self::P1_09,
-// 			embassy_nrf::gpio::AnyPin::P1_10 => Self::P1_10,
-// 			embassy_nrf::gpio::AnyPin::P1_11 => Self::P1_11,
-// 			embassy_nrf::gpio::AnyPin::P1_12 => Self::P1_12,
-// 			embassy_nrf::gpio::AnyPin::P1_13 => Self::P1_13,
-// 			embassy_nrf::gpio::AnyPin::P1_14 => Self::P1_14,
-// 			embassy_nrf::gpio::AnyPin::P1_15 => Self::P1_15,
-// 			embassy_nrf::gpio::AnyPin::P1_16 => Self::P1_16,
-// 			embassy_nrf::gpio::AnyPin::P1_17 => Self::P1_17,
-// 			embassy_nrf::gpio::AnyPin::P1_18 => Self::P1_18,
-// 			embassy_nrf::gpio::AnyPin::P1_19 => Self::P1_19,
-// 			embassy_nrf::gpio::AnyPin::P1_20 => Self::P1_20,
-// 			embassy_nrf::gpio::AnyPin::P1_21 => Self::P1_21,
-// 			embassy_nrf::gpio::AnyPin::P1_22 => Self::P1_22,
-// 			embassy_nrf::gpio::AnyPin::P1_23 => Self::P1_23,
-// 			embassy_nrf::gpio::AnyPin::P1_24 => Self::P1_24,
-// 			embassy_nrf::gpio::AnyPin::P1_25 => Self::P1_25,
-// 			embassy_nrf::gpio::AnyPin::P1_26 => Self::P1_26,
-// 			embassy_nrf::gpio::AnyPin::P1_27 => Self::P1_27,
-// 			embassy_nrf::gpio::AnyPin::P1_28 => Self::P1_28,
-// 			embassy_nrf::gpio::AnyPin::P1_29 => Self::P1_29,
-// 			embassy_nrf::gpio::AnyPin::P1_30 => Self::P1_30,
-// 			embassy_nrf::gpio::AnyPin::P1_31 => Self::P1_31,
-// 			_ => panic!("Invalid pin"),
-// 		}
-// 	}
-// }
-
-// #[cfg(feature = "nrf")]
-// impl Into<embassy_nrf::gpio::AnyPin> for Pin {
-// 	fn into(self) -> embassy_nrf::gpio::AnyPin {
-// 		match self {
-// 			Self::P0_00 => embassy_nrf::gpio::AnyPin::P0_00,
-// 			Self::P0_01 => embassy_nrf::gpio::AnyPin::P0_01,
-// 			Self::P0_02 => embassy_nrf::gpio::AnyPin::P0_02,
-// 			Self::P0_03 => embassy_nrf::gpio::AnyPin::P0_03,
-// 			Self::P0_04 => embassy_nrf::gpio::AnyPin::P0_04,
-// 			Self::P0_05 => embassy_nrf::gpio::AnyPin::P0_05,
-// 			Self::P0_06 => embassy_nrf::gpio::AnyPin::P0_06,
-// 			Self::P0_07 => embassy_nrf::gpio::AnyPin::P0_07,
-// 			Self::P0_08 => embassy_nrf::gpio::AnyPin::P0_08,
-// 			Self::P0_09 => embassy_nrf::gpio::AnyPin::P0_09,
-// 			Self::P0_10 => embassy_nrf::gpio::AnyPin::P0_10,
-// 			Self::P0_11 => embassy_nrf::gpio::AnyPin::P0_11,
-// 			Self::P0_12 => embassy_nrf::gpio::AnyPin::P0_12,
-// 			Self::P0_13 => embassy_nrf::gpio::AnyPin::P0_13,
-// 			Self::P0_14 => embassy_nrf::gpio::AnyPin::P0_14,
-// 			Self::P0_15 => embassy_nrf::gpio::AnyPin::P0_15,
-// 			Self::P0_16 => embassy_nrf::gpio::AnyPin::P0_16,
-// 			Self::P0_17 => embassy_nrf::gpio::AnyPin::P0_17,
-// 			Self::P0_18 => embassy_nrf::gpio::AnyPin::P0_18,
-// 			Self::P0_19 => embassy_nrf::gpio::AnyPin::P0_19,
-// 			Self::P0_20 => embassy_nrf::gpio::AnyPin::P0_20,
-// 			Self::P0_21 => embassy_nrf::gpio::AnyPin::P0_21,
-// 			Self::P0_22 => embassy_nrf::gpio::AnyPin::P0_22,
-// 			Self::P0_23 => embassy_nrf::gpio::AnyPin::P0_23,
-// 			Self::P0_24 => embassy_nrf::gpio::AnyPin::P0_24,
-// 			Self::P0_25 => embassy_nrf::gpio::AnyPin::P0_25,
-// 			Self::P0_26 => embassy_nrf::gpio::AnyPin::P0_26,
-// 			Self::P0_27 => embassy_nrf::gpio::AnyPin::P0_27,
-// 			Self::P0_28 => embassy_nrf::gpio::AnyPin::P0_28,
-// 			Self::P0_29 => embassy_nrf::gpio::AnyPin::P0_29,
-// 			Self::P0_30 => embassy_nrf::gpio::AnyPin::P0_30,
-// 			Self::P0_31 => embassy_nrf::gpio::AnyPin::P0_31,
-// 			Self::P1_00 => embassy_nrf::gpio::AnyPin::P1_00,
-// 			Self::P1_01 => embassy_nrf::gpio::AnyPin::P1_01,
-// 			Self::P1_02 => embassy_nrf::gpio::AnyPin::P1_02,
-// 			Self::P1_03 => embassy_nrf::gpio::AnyPin::P1_03,
-// 			Self::P1_04 => embassy_nrf::gpio::AnyPin::P1_04,
-// 			Self::P1_05 => embassy_nrf::gpio::AnyPin::P1_05,
-// 			Self::P1_06 => embassy_nrf::gpio::AnyPin::P1_06,
-// 			Self::P1_07 => embassy_nrf::gpio::AnyPin::P1_07,
-// 			Self::P1_08 => embassy_nrf::gpio::AnyPin::P1_08,
-// 			Self::P1_09 => embassy_nrf::gpio::AnyPin::P1_09,
-// 			Self::P1_10 => embassy_nrf::gpio::AnyPin::P1_10,
-// 			Self::P1_11 => embassy_nrf::gpio::AnyPin::P1_11,
-// 			Self::P1_12 => embassy_nrf::gpio::AnyPin::P1_12,
-// 			Self::P1_13 => embassy_nrf::gpio::AnyPin::P1_13,
-// 			Self::P1_14 => embassy_nrf::gpio::AnyPin::P1_14,
-// 			Self::P1_15 => embassy_nrf::gpio::AnyPin::P1_15,
-// 			Self::P1_16 => embassy_nrf::gpio::AnyPin::P1_16,
-// 			Self::P1_17 => embassy_nrf::gpio::AnyPin::P1_17,
-// 			Self::P1_18 => embassy_nrf::gpio::AnyPin::P1_18,
-// 			Self::P1_19 => embassy_nrf::gpio::AnyPin::P1_19,
-// 			Self::P1_20 => embassy_nrf::gpio::AnyPin::P1_20,
-// 			Self::P1_21 => embassy_nrf::gpio::AnyPin::P1_21,
-// 			Self::P1_22 => embassy_nrf::gpio::AnyPin::P1_22,
-// 			Self::P1_23 => embassy_nrf::gpio::AnyPin::P1_23,
-// 			Self::P1_24 => embassy_nrf::gpio::AnyPin::P1_24,
-// 			Self::P1_25 => embassy_nrf::gpio::AnyPin::P1_25,
-// 			Self::P1_26 => embassy_nrf::gpio::AnyPin::P1_26,
-// 			Self::P1_27 => embassy_nrf::gpio::AnyPin::P1_27,
-// 			Self::P1_28 => embassy_nrf::gpio::AnyPin::P1_28,
-// 			Self::P1_29 => embassy_nrf::gpio::AnyPin::P1_29,
-// 			Self::P1_30 => embassy_nrf::gpio::AnyPin::P1_30,
-// 			Self::P1_31 => embassy_nrf::gpio::AnyPin::P1_31,
-// 			_ => panic!("Invalid pin"),
-// 		}
-// 	}
-// }
+);

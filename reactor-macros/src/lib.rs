@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ExprArray, Expr, parse::Parse, parse::ParseStream, Result};
+use syn::{parse::{Parse, ParseStream}, Expr, ExprArray, Result};
 
 struct SubscribersTaskInput {
 	channel: Expr,
@@ -42,7 +42,7 @@ pub fn subscribers_task(input: TokenStream) -> TokenStream {
 			#[embassy_executor::task]
 			async fn subscriber_task(mut subscribers: [&'static mut dyn reactor::RSubscriber; #subscribers_count], mut middleware: [&'static mut dyn reactor::middleware::Middleware; #middleware_count]) {
 				// Expects subscriber to be a global but that's fine?
-				let mut listener: embassy_sync::pubsub::Subscriber<_, _, _, _, _> = #channel.subscriber().unwrap();
+				let mut listener = #channel.subscriber().unwrap();
 				let publisher = #channel.publisher().unwrap();
 				info!("Subscriber task started");
 
