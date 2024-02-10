@@ -1,6 +1,7 @@
 use defmt::Format;
+use strum::EnumString;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format, EnumString)]
 pub enum KeyEvent {
 	Pressed(KeyCode),
 	Released(KeyCode),
@@ -9,8 +10,15 @@ pub enum KeyEvent {
 	// DoublePressed(KeyCode),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Format)]
+impl Default for KeyEvent {
+	fn default() -> Self {
+		Self::Released(KeyCode::None)
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Format, EnumString)]
 pub enum InternalEvent {
+	None,
 	LayerNext,
 	LayerPrev,
 	LayerChange(usize),
@@ -20,7 +28,13 @@ pub enum InternalEvent {
 	BLEChange(usize),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
+impl Default for InternalEvent {
+	fn default() -> Self {
+		Self::None
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format, EnumString)]
 pub enum ReactorEvent {
 	// Keyboard
 	Key(KeyEvent),
@@ -54,7 +68,7 @@ pub enum ReactorEvent {
 	HardwareMappedU16(u16, usize, usize),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Format, EnumString)]
 #[repr(u8)]
 pub enum KeyCode {
 	None = 0x00,
@@ -328,7 +342,7 @@ impl From<u8> for KeyCode {
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format, EnumString)]
 pub enum KeyCodeInt {
 	None,
 	Key(KeyCode),

@@ -1,6 +1,8 @@
 use core::pin::Pin;
 
 use alloc::boxed::Box;
+use alloc::vec;
+use alloc::vec::Vec;
 use defmt::*;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
@@ -12,11 +14,11 @@ use reactor::reactor_event::*;
 
 pub const KEYMAP_PERIOD: u64 = 2;
 
-pub struct Keymap<const R: usize, const C: usize, const L: usize> {
-	pub layers: [[[KeyCodeInt; C]; R]; L],
+pub struct Keymap {
+	pub layers: Vec<Vec<Vec<KeyCodeInt>>>,
 	pub hold_cycles: u16,
 	current_layer: usize,
-	last_state: [[(KeyEvent, u8); C]; R],
+	last_state: Vec<Vec<(KeyEvent, u8)>>,
 	channel: Publisher<
 		'static,
 		CriticalSectionRawMutex,
@@ -27,28 +29,24 @@ pub struct Keymap<const R: usize, const C: usize, const L: usize> {
 	>,
 }
 
-impl<const R: usize, const C: usize, const L: usize> Keymap<R, C, L> {
-	pub fn new(keymap: [[[KeyCodeInt; C]; R]; L], hold_cycles: u16) -> Self {
-		let last_state = [[(KeyEvent::Released(KeyCode::None), 0); C]; R];
-
+impl Keymap {
+	pub fn new(keymap: Vec<Vec<Vec<KeyCodeInt>>>, hold_cycles: u16) -> Self {
 		Self {
 			layers: keymap,
 			hold_cycles,
-			last_state,
-			current_layer: 0,
-			channel: CHANNEL.publisher().unwrap(),
+			..Default::default()
 		}
 	}
 }
 
-impl<const R: usize, const C: usize, const L: usize> Default for Keymap<R, C, L> {
+impl Default for Keymap {
 	fn default() -> Self {
-		let keymap = [[[KeyCodeInt::None; C]; R]; L];
+		let keymap = vec![vec![vec![]]];
 
 		Self {
 			layers: keymap,
 			hold_cycles: 0,
-			last_state: [[(KeyEvent::Released(KeyCode::None), 0); C]; R],
+			last_state: vec![vec![(KeyEvent::Released(KeyCode::None), 0)]],
 			current_layer: 0,
 			channel: CHANNEL.publisher().unwrap(),
 		}
@@ -56,7 +54,7 @@ impl<const R: usize, const C: usize, const L: usize> Default for Keymap<R, C, L>
 }
 
 // TODO: Specify the is_supported
-impl<const R: usize, const C: usize, const L: usize> Middleware for Keymap<R, C, L> {
+impl Middleware for Keymap {
 	fn process(&mut self, event: ReactorEvent) -> Pin<Box<dyn Future<Output = Option<ReactorEvent>> + '_>> {
 		Box::pin(async move {
 			let (value, rindex, cindex) = match event {
@@ -72,19 +70,19 @@ impl<const R: usize, const C: usize, const L: usize> Middleware for Keymap<R, C,
 				match event {
 					InternalEvent::LayerNext => {
 						self.current_layer += 1;
-						if self.current_layer >= L {
+						if self.current_layer >= self.layers.len() {
 							self.current_layer = 0;
 						}
 					},
 					InternalEvent::LayerPrev =>
 						if self.current_layer == 0 {
-							self.current_layer = L - 1;
+							self.current_layer = self.layers.len() - 1;
 						} else {
 							self.current_layer -= 1;
 						},
 					InternalEvent::LayerChange(target) => {
 						self.current_layer = target;
-						if self.current_layer >= L {
+						if self.current_layer >= self.layers.len() {
 							self.current_layer = 0;
 						}
 					},

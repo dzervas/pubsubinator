@@ -29,14 +29,14 @@ nrf_softdevice = true
 # period = 2
 layers = [
 	[
-		"Kb1", "Kb2", "Kb3",
-		"Kb4", "Kb5", "Kb6",
-		"Kb7", "Kb8", "Kb9"
+		[ "Kb1", "Kb2", "Kb3", ],
+		[ "Kb4", "Kb5", "Kb6", ],
+		[ "Kb7", "Kb8", "Kb9" ],
 	],
 	[
-		"Intl1", "Intl2", "Intl3",
-		"Intl4", "Intl5", "Intl6",
-		"Intl7", "Intl8", "Intl9"
+		[ "Intl1", "Intl2", "Intl3", ],
+		[ "Intl4", "Intl5", "Intl6", ],
+		[ "Intl7", "Intl8", "Intl9" ],
 	]
 ]
 

@@ -32,8 +32,7 @@ use embassy_sync::pubsub::PubSubChannel;
 use embassy_time::{Duration, Ticker};
 use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
-use reactor::reactor_event::KeyCodeInt::Key;
-use reactor::reactor_event::{KeyCode, ReactorEvent};
+use reactor::reactor_event::ReactorEvent;
 use reactor::Polled;
 use static_cell::make_static;
 
@@ -54,11 +53,12 @@ pub mod keymap_mid;
 pub mod matrix;
 pub mod nrf;
 pub mod usb_hid;
+pub mod config_types;
+pub mod config;
 
 #[allow(unused_imports)]
 use crate::analog_nrf::Analog;
 use crate::ble_hid::{ble_hid_task, BleHid};
-use crate::keymap_mid::KEYMAP_PERIOD;
 use crate::matrix::Matrix;
 use crate::nrf::{usb_init, usb_task};
 use crate::usb_hid::UsbHid;
@@ -136,21 +136,7 @@ async fn main(spawner: Spawner) {
 	info!("Matrix publisher initialized");
 
 	// --- Setup Keymap middleware ---
-	let keymap = make_static!(keymap_mid::Keymap::new(
-		[
-			[
-				[Key(KeyCode::Kb1), Key(KeyCode::Kb2), Key(KeyCode::Kb3)],
-				[Key(KeyCode::Kb4), Key(KeyCode::Kb5), Key(KeyCode::Kb6)],
-				[Key(KeyCode::Kb7), Key(KeyCode::Kb8), Key(KeyCode::Kb9)],
-			],
-			[
-				[Key(KeyCode::Intl1), Key(KeyCode::Intl2), Key(KeyCode::Intl3)],
-				[Key(KeyCode::Intl4), Key(KeyCode::Intl5), Key(KeyCode::Intl6)],
-				[Key(KeyCode::Intl7), Key(KeyCode::Intl8), Key(KeyCode::Intl9)],
-			]
-		],
-		2000 / KEYMAP_PERIOD as u16,
-	));
+	let keymap = make_static!(config::KEYMAP.build());
 	info!("Keymap middleware initialized");
 
 	// --- Setup Keyboard Report middleware ---

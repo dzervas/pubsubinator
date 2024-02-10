@@ -8,12 +8,38 @@
 //! updating `memory.x` ensures a rebuild of the application with the
 //! new memory settings.
 
-// use convert_case::{Case, Casing};
-// use std::io::Write;
+use convert_case::{Case, Casing};
+use std::io::Write;
 use std::{env, fs};
 use std::fs::{copy, File};
 use std::path::{Path, PathBuf};
-// use toml;
+use toml;
+
+fn value_to_rust(value: &toml::Value) -> String {
+	match value {
+		toml::Value::String(s) => format!("\"{}\"", s),
+		toml::Value::Integer(i) => i.to_string(),
+		toml::Value::Float(f) => f.to_string(),
+		toml::Value::Boolean(b) => b.to_string(),
+		toml::Value::Array(arr) => {
+			let elements = arr.iter()
+							  .map(|v| value_to_rust(v))
+							  .collect::<Vec<_>>()
+							  .join(", ");
+			format!("vec![{}]", elements)
+		},
+		toml::Value::Table(table) => {
+			let fields = table.iter()
+							  .map(|(k, v)| format!("{}: {}", k, value_to_rust(v)))
+							  .collect::<Vec<_>>()
+							  .join(",\n\t");
+			format!("{{\n\t{}\n}}", fields) // Assuming you have a corresponding struct
+		},
+		// Handle other TOML types as needed
+		_ => panic!("Unsupported TOML value type"),
+	}
+}
+
 
 fn main() {
 	// Put `memory.x` in our output directory and ensure it's
@@ -32,33 +58,37 @@ fn main() {
 	println!("cargo:rustc-link-arg-bins=-Tlink.x");
 	println!("cargo:rustc-link-arg-bins=-Tdefmt.x");
 
-	// let board_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("boards").join("example.toml");
-	// let board = fs::read_to_string(&board_path).expect(format!("Could not read config file {}", (&board_path).to_str().unwrap()).as_str());
-	// println!("cargo:rerun-if-changed={:?}", board_path);
+	let board_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("boards").join("example.toml");
+	let board = fs::read_to_string(&board_path).expect(format!("Could not read config file {}", (&board_path).to_str().unwrap()).as_str());
+	println!("cargo:rerun-if-changed={:?}", board_path);
 
-	// let config_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("config.rs");
-	// let mut config = File::create(&config_path).unwrap();
-	// println!("cargo:rerun-if-changed={:?}", config_path);
+	let config_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("config.rs");
+	let mut config = File::create(&config_path).unwrap();
+	println!("cargo:rerun-if-changed={:?}", config_path);
 
-	// writeln!(config, "use crate::keymap_mid::*;\n").unwrap();
+	writeln!(config, "use alloc::vec;").unwrap();
+	writeln!(config, "use lazy_static::lazy_static;").unwrap();
+	writeln!(config, "use crate::config_types::*;\n").unwrap();
 
-	// for (section, items) in toml::from_str::<toml::Table>(board.as_str()).unwrap() {
-	// 	if section == "global" {
-	// 		continue;
-	// 	}
+	writeln!(config, "lazy_static! {{").unwrap();
+	for (section, items) in toml::from_str::<toml::Table>(board.as_str()).unwrap() {
+		if section == "global" {
+			continue;
+		}
 
-	// 	let fields = items
-	// 		.as_table()
-	// 		.unwrap()
-	// 		.into_iter()
-	// 		.map(|(k, v)| format!("\t{}: {}", k, v))
-	// 		.collect::<Vec<String>>()
-	// 		.join(",\n");
-	// 	let name = section.to_case(Case::Upper);
-	// 	let field_type = section.to_case(Case::Pascal);
+		let fields = items
+			.as_table()
+			.unwrap()
+			.into_iter()
+			.map(|(k, v)| format!("\t{}: {}", k, value_to_rust(v)))
+			.collect::<Vec<String>>()
+			.join(",\n\t\t");
+		let name = section.to_case(Case::Upper);
+		let field_type = section.to_case(Case::Pascal);
 
-	// 	writeln!(config, "pub static {0}: {1} = {1} {{\n{2},\n\t..Default::default()\n}};\n" , name, field_type, fields).unwrap();
-	// }
+		writeln!(config, "\tpub static ref {0}: {1}Config = {1}Config {{\n\t{2},\n\t\t..Default::default()\n\t}};\n" , name, field_type, fields).unwrap();
+	}
+	writeln!(config, "}}").unwrap();
 
-	// config.sync_all().unwrap();
+	config.sync_all().unwrap();
 }
