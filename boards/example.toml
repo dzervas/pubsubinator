@@ -1,16 +1,21 @@
 [global]
+# Device-specific configuration
 name = "LaunchPad" # Name of the board
 version = "1.0.0" # Revision of the board
+serial = "123456" # Serial number of the device
+
+# Conditional compilation
 features = [
 	"nrf52840", # Target MCU - assumes nrf
 	"ble", # Enable BLE support
 	"usb" # Enable USB support
 ]
 
-serial_number = "123456"
-subscribers = [ "ble_hid", "usb_hid" ]
+# Publishers/Subscribers configuration
+publishers = [ "matrix" ]
 middleware = [ "keymap", "keyboard_report" ]
-nrf_softdevice = true
+subscribers = [ "ble_hid", "usb_hid" ]
+# nrf_softdevice = true
 
 [matrix]
 inputs = [

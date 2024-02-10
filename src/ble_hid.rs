@@ -375,10 +375,10 @@ pub struct Server {
 impl Server {
 	pub fn init(&mut self) {
 		self.dis
-			.model_number_set(&String::try_from("Launchpad").unwrap())
+			.model_number_set(&String::try_from(env!("DEVICE_NAME")).unwrap())
 			.unwrap();
 		self.dis
-			.serial_number_set(&String::try_from("123456").unwrap())
+			.serial_number_set(&String::try_from(env!("DEVICE_SERIAL")).unwrap())
 			.unwrap();
 		self.dis
 			.manufacturer_name_set(&String::try_from("PubSubinator").unwrap())
@@ -386,9 +386,10 @@ impl Server {
 		self.dis
 			.pnp_id_set(&PnPID {
 				vid_source: VidSource::UsbIF,
-				vendor_id: 0x05AC,
-				product_id: 0x820A,
-				product_version: 0x0100,
+				vendor_id: 0xC0DE,
+				product_id: 0xCAFE,
+				product_version: u16::from_str_radix(env!("DEVICE_VERSION").replace(".", "").as_str(), 16)
+					.expect("Device version is not a valid hex number"),
 			})
 			.unwrap();
 
@@ -412,7 +413,7 @@ impl<'a> BleHid<'a> {
 				ServiceList::Incomplete,
 				&[ServiceUuid16::BATTERY, ServiceUuid16::HUMAN_INTERFACE_DEVICE],
 			)
-			.full_name("PubSubinator")
+			.full_name(env!("DEVICE_NAME"))
 			.raw(AdvertisementDataType::APPEARANCE, &[0xC1, 0x03])
 			.build();
 

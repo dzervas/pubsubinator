@@ -43,6 +43,32 @@ fn value_to_rust(section: &str, key: &str, value: &toml::Value) -> String {
 	}
 }
 
+fn handle_global_section(key: &str, value: &toml::Value) {
+	match key {
+		"name" | "version" | "serial" => println!(
+			"cargo:rustc-env=DEVICE_{}={}",
+			key.to_uppercase(),
+			value.as_str().unwrap()
+		),
+		"features" => value
+			.as_array()
+			.unwrap()
+			.iter()
+			.for_each(|v| println!("cargo:rustc-cfg={}", v.as_str().unwrap())),
+		"publishers" | "middleware" | "subscribers" => {
+			let joined = value
+				.as_array()
+				.unwrap()
+				.iter()
+				.map(|v| v.to_string())
+				.collect::<Vec<String>>()
+				.join(",");
+			println!("cargo:rustc-env=PUBSUB_{}={}", key.to_uppercase(), joined);
+		},
+		_ => println!("cargo:warning=unrecognized global key {}", key),
+	}
+}
+
 fn main() {
 	// Put `memory.x` in our output directory and ensure it's
 	// on the linker search path.
@@ -78,6 +104,12 @@ fn main() {
 	writeln!(config, "lazy_static! {{").unwrap();
 	for (section, items) in toml::from_str::<toml::Table>(board.as_str()).unwrap() {
 		if section == "global" {
+			items
+				.as_table()
+				.unwrap()
+				.into_iter()
+				.for_each(|(k, v)| handle_global_section(k, v));
+
 			continue;
 		}
 

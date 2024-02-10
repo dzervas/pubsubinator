@@ -158,9 +158,9 @@ async fn main(spawner: Spawner) {
 			_bitfield_1: raw::ble_gap_cfg_role_count_t::new_bitfield_1(0),
 		}),
 		gap_device_name: Some(raw::ble_gap_cfg_device_name_t {
-			p_value: b"PubSubinator" as *const u8 as _,
-			current_len: 12,
-			max_len: 12,
+			p_value: env!("DEVICE_NAME").as_ptr() as _,
+			current_len: env!("DEVICE_NAME").len() as u16,
+			max_len: env!("DEVICE_NAME").len() as u16,
 			write_perm: unsafe { mem::zeroed() },
 			// TODO: Use the SecurityMode enum
 			// write_perm: raw::ble_gap_conn_sec_mode_t {

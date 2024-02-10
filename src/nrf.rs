@@ -29,10 +29,10 @@ pub fn usb_init(p_usbd: peripherals::USBD) -> Builder<'static, UsbDriver> {
 
 	let driver = Driver::new(p_usbd, Irqs, &*VBUS_DETECT);
 
-	let mut usb_config = Config::new(0xc0de, 0xcafe);
+	let mut usb_config = Config::new(0xC0DE, 0xCAFE);
 	usb_config.manufacturer = Some("PubSubinator");
-	usb_config.product = Some("LaunchPad");
-	usb_config.serial_number = Some(env!("CARGO_PKG_VERSION"));
+	usb_config.product = Some(env!("DEVICE_NAME"));
+	usb_config.serial_number = Some(env!("DEVICE_SERIAL"));
 	usb_config.max_power = 100;
 	usb_config.max_packet_size_0 = 64;
 	usb_config.supports_remote_wakeup = true;
