@@ -328,6 +328,7 @@ impl From<u8> for KeyCode {
 	}
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Format)]
 pub enum KeyCodeInt {
 	None,
 	Key(KeyCode),

@@ -113,3 +113,7 @@ panic = "abort"
 strip = true
 
 [profile.release.package]
+
+[build-dependencies]
+convert_case = "0.6.0"
+toml = "0.8.10"

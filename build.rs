@@ -8,9 +8,12 @@
 //! updating `memory.x` ensures a rebuild of the application with the
 //! new memory settings.
 
-use std::env;
-use std::fs::copy;
-use std::path::PathBuf;
+// use convert_case::{Case, Casing};
+// use std::io::Write;
+use std::{env, fs};
+use std::fs::{copy, File};
+use std::path::{Path, PathBuf};
+// use toml;
 
 fn main() {
 	// Put `memory.x` in our output directory and ensure it's
@@ -28,4 +31,34 @@ fn main() {
 	println!("cargo:rustc-link-arg-bins=--nmagic");
 	println!("cargo:rustc-link-arg-bins=-Tlink.x");
 	println!("cargo:rustc-link-arg-bins=-Tdefmt.x");
+
+	// let board_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("boards").join("example.toml");
+	// let board = fs::read_to_string(&board_path).expect(format!("Could not read config file {}", (&board_path).to_str().unwrap()).as_str());
+	// println!("cargo:rerun-if-changed={:?}", board_path);
+
+	// let config_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("config.rs");
+	// let mut config = File::create(&config_path).unwrap();
+	// println!("cargo:rerun-if-changed={:?}", config_path);
+
+	// writeln!(config, "use crate::keymap_mid::*;\n").unwrap();
+
+	// for (section, items) in toml::from_str::<toml::Table>(board.as_str()).unwrap() {
+	// 	if section == "global" {
+	// 		continue;
+	// 	}
+
+	// 	let fields = items
+	// 		.as_table()
+	// 		.unwrap()
+	// 		.into_iter()
+	// 		.map(|(k, v)| format!("\t{}: {}", k, v))
+	// 		.collect::<Vec<String>>()
+	// 		.join(",\n");
+	// 	let name = section.to_case(Case::Upper);
+	// 	let field_type = section.to_case(Case::Pascal);
+
+	// 	writeln!(config, "pub static {0}: {1} = {1} {{\n{2},\n\t..Default::default()\n}};\n" , name, field_type, fields).unwrap();
+	// }
+
+	// config.sync_all().unwrap();
 }

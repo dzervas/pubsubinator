@@ -13,9 +13,9 @@ use reactor::reactor_event::*;
 pub const KEYMAP_PERIOD: u64 = 2;
 
 pub struct Keymap<const R: usize, const C: usize, const L: usize> {
-	keymap: [[[KeyCodeInt; C]; R]; L],
+	pub layers: [[[KeyCodeInt; C]; R]; L],
 	pub hold_cycles: u16,
-	layer: usize,
+	current_layer: usize,
 	last_state: [[(KeyEvent, u8); C]; R],
 	channel: Publisher<
 		'static,
@@ -32,10 +32,24 @@ impl<const R: usize, const C: usize, const L: usize> Keymap<R, C, L> {
 		let last_state = [[(KeyEvent::Released(KeyCode::None), 0); C]; R];
 
 		Self {
-			keymap,
+			layers: keymap,
 			hold_cycles,
 			last_state,
-			layer: 0,
+			current_layer: 0,
+			channel: CHANNEL.publisher().unwrap(),
+		}
+	}
+}
+
+impl<const R: usize, const C: usize, const L: usize> Default for Keymap<R, C, L> {
+	fn default() -> Self {
+		let keymap = [[[KeyCodeInt::None; C]; R]; L];
+
+		Self {
+			layers: keymap,
+			hold_cycles: 0,
+			last_state: [[(KeyEvent::Released(KeyCode::None), 0); C]; R],
+			current_layer: 0,
 			channel: CHANNEL.publisher().unwrap(),
 		}
 	}
@@ -49,35 +63,35 @@ impl<const R: usize, const C: usize, const L: usize> Middleware for Keymap<R, C,
 				ReactorEvent::HardwareMappedBool(value, rindex, cindex) => (value, rindex, cindex),
 				_ => return None,
 			};
-			let active_keymap = &self.keymap[self.layer];
+			let active_keymap = &self.layers[self.current_layer];
 
 			let mut new_state: KeyEvent = self.last_state[rindex][cindex].0;
 
 			if let KeyCodeInt::Internal(event) = active_keymap[rindex][cindex] {
-				let old_layer = self.layer;
+				let old_layer = self.current_layer;
 				match event {
 					InternalEvent::LayerNext => {
-						self.layer += 1;
-						if self.layer >= L {
-							self.layer = 0;
+						self.current_layer += 1;
+						if self.current_layer >= L {
+							self.current_layer = 0;
 						}
 					},
 					InternalEvent::LayerPrev =>
-						if self.layer == 0 {
-							self.layer = L - 1;
+						if self.current_layer == 0 {
+							self.current_layer = L - 1;
 						} else {
-							self.layer -= 1;
+							self.current_layer -= 1;
 						},
 					InternalEvent::LayerChange(target) => {
-						self.layer = target;
-						if self.layer >= L {
-							self.layer = 0;
+						self.current_layer = target;
+						if self.current_layer >= L {
+							self.current_layer = 0;
 						}
 					},
 					_ => {},
 				}
 
-				if old_layer != self.layer {
+				if old_layer != self.current_layer {
 					for row in self.last_state.iter_mut() {
 						for code in row.iter_mut() {
 							if let KeyEvent::Pressed(key) = code.0 {
