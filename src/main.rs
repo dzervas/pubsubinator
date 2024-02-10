@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+// make_static! macro requires this
 #![feature(type_alias_impl_trait)]
 
 extern crate alloc;
@@ -11,7 +12,6 @@ use core::mem;
 use core::mem::size_of;
 
 use defmt::*;
-use embassy_nrf::gpio::{AnyPin, Input, Output};
 
 use embassy_executor::{task, Spawner};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
@@ -36,19 +36,18 @@ use nrf_softdevice::{raw, SocEvent, Softdevice};
 
 pub mod analog_nrf;
 pub mod ble_hid;
+pub mod config;
+pub mod config_types;
+pub mod gpio;
 pub mod keyboard_report_mid;
 pub mod keymap_mid;
 pub mod matrix;
 pub mod nrf;
 pub mod usb_hid;
-pub mod config_types;
-pub mod config;
-pub mod gpio;
 
 #[allow(unused_imports)]
 use crate::analog_nrf::Analog;
 use crate::ble_hid::{ble_hid_task, BleHid};
-use crate::matrix::Matrix;
 use crate::nrf::{usb_init, usb_task};
 use crate::usb_hid::UsbHid;
 
@@ -105,7 +104,7 @@ async fn main(spawner: Spawner) {
 	let p = embassy_nrf::init(config);
 
 	// --- Setup Matrix publisher ---
-	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>> = make_static!(config::MATRIX.build());
+	let matrix = make_static!(config::MATRIX.build());
 	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");
 

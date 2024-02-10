@@ -7,8 +7,8 @@ use core::pin::Pin;
 use alloc::boxed::Box;
 use futures::Future;
 
-pub mod reactor_event;
 pub mod middleware;
+pub mod reactor_event;
 
 pub use crate::reactor_event::*;
 

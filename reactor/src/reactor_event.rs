@@ -38,17 +38,43 @@ impl Default for InternalEvent {
 pub enum ReactorEvent {
 	// Keyboard
 	Key(KeyEvent),
-	Locks { caps: bool, num: bool, scroll: bool },
-	KeyboardReport { modifier: KeyModifiers, keycodes: [KeyCode; 6] },
+	Locks {
+		caps: bool,
+		num: bool,
+		scroll: bool,
+	},
+	KeyboardReport {
+		modifier: KeyModifiers,
+		keycodes: [KeyCode; 6],
+	},
 
 	// Mouse
 	// TODO: Handle the mouse wheel
-	Mouse { x: u32, y: u32 },
+	Mouse {
+		x: u32,
+		y: u32,
+	},
 
-	Potentiometer { v: i16 },
-	Joystick { x: i16, y: i16 },
-	FullJoystick { x: i16, y: i16, z: i16 },
-	SpaceMouse { x: i16, y: i16, z: i16, a: i16, b: i16, c: i16 },
+	Potentiometer {
+		v: i16,
+	},
+	Joystick {
+		x: i16,
+		y: i16,
+	},
+	FullJoystick {
+		x: i16,
+		y: i16,
+		z: i16,
+	},
+	SpaceMouse {
+		x: i16,
+		y: i16,
+		z: i16,
+		a: i16,
+		b: i16,
+		c: i16,
+	},
 
 	// Battery percentage report
 	Battery(u8),
@@ -56,7 +82,11 @@ pub enum ReactorEvent {
 	// Simple LED control
 	LED(bool),
 	LEDAnalog(u8),
-	RGBLED { r: u8, g: u8, b: u8 },
+	RGBLED {
+		r: u8,
+		g: u8,
+		b: u8,
+	},
 
 	// TODO: LED strip
 	// TODO: Screen (widgets?)
@@ -378,14 +408,14 @@ impl Default for KeyModifiers {
 
 impl Into<u8> for KeyModifiers {
 	fn into(self) -> u8 {
-		(self.lctrl as u8) << 0 |
-		(self.lshift as u8) << 1 |
-		(self.lalt as u8) << 2 |
-		(self.lgui as u8) << 3 |
-		(self.rctrl as u8) << 4 |
-		(self.rshift as u8) << 5 |
-		(self.ralt as u8) << 6 |
-		(self.rgui as u8) << 7
+		(self.lctrl as u8) << 0
+			| (self.lshift as u8) << 1
+			| (self.lalt as u8) << 2
+			| (self.lgui as u8) << 3
+			| (self.rctrl as u8) << 4
+			| (self.rshift as u8) << 5
+			| (self.ralt as u8) << 6
+			| (self.rgui as u8) << 7
 	}
 }
 

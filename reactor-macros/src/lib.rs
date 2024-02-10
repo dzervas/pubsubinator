@@ -2,7 +2,8 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::{Parse, ParseStream}, Expr, ExprArray, Result};
+use syn::parse::{Parse, ParseStream};
+use syn::{Expr, ExprArray, Result};
 
 struct SubscribersTaskInput {
 	channel: Expr,

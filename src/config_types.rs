@@ -4,7 +4,9 @@ use alloc::vec::Vec;
 use core::str::FromStr;
 use reactor::*;
 
-use crate::{gpio::{Drive, Input, Level, Output, Pin, Pull}, keymap_mid::*, matrix::{Matrix, MatrixDirection}};
+use crate::gpio::{Drive, Input, Level, Output, Pin, Pull};
+use crate::keymap_mid::*;
+use crate::matrix::{Matrix, MatrixDirection};
 
 #[derive(Debug, Default)]
 pub struct KeymapConfig {
@@ -14,17 +16,23 @@ pub struct KeymapConfig {
 
 impl KeymapConfig {
 	pub fn build(&self) -> Keymap {
-		let layers = self.layers.iter().map(|layer| {
-			layer.iter().map(|row| {
-				row.iter().map(|key| {
-					KeyCodeInt::Key(KeyCode::from_str(key).unwrap())
-				}).collect::<Vec<KeyCodeInt>>()
-			}).collect::<Vec<Vec<KeyCodeInt>>>()
-		}).collect::<Vec<Vec<Vec<KeyCodeInt>>>>();
+		let layers = self
+			.layers
+			.iter()
+			.map(|layer| {
+				layer
+					.iter()
+					.map(|row| {
+						row.iter()
+							.map(|key| KeyCodeInt::Key(KeyCode::from_str(key).unwrap()))
+							.collect::<Vec<KeyCodeInt>>()
+					})
+					.collect::<Vec<Vec<KeyCodeInt>>>()
+			})
+			.collect::<Vec<Vec<Vec<KeyCodeInt>>>>();
 
 		Keymap::new(layers, self.hold_cycles)
 	}
-
 }
 
 #[derive(Debug, Default)]
@@ -36,12 +44,8 @@ pub struct MatrixConfig {
 
 impl MatrixConfig {
 	pub fn build(&self) -> Matrix<Input, Output> {
-		let inputs = self.inputs.iter().map(|input| {
-			input.into()
-		}).collect::<Vec<Input>>();
-		let outputs = self.outputs.iter().map(|output| {
-			output.into()
-		}).collect::<Vec<Output>>();
+		let inputs = self.inputs.iter().map(|input| input.into()).collect::<Vec<Input>>();
+		let outputs = self.outputs.iter().map(|output| output.into()).collect::<Vec<Output>>();
 
 		Matrix::new(inputs, outputs, MatrixDirection::from_str(self.direction).unwrap())
 	}

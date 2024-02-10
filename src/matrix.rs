@@ -3,8 +3,8 @@ use core::pin::Pin;
 
 use crate::{PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 use embedded_hal::digital::{InputPin, OutputPin};
