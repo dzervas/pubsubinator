@@ -15,7 +15,7 @@ use std::fs::{copy, File};
 use std::path::{Path, PathBuf};
 use toml;
 
-fn value_to_rust(value: &toml::Value) -> String {
+fn value_to_rust(section: &str, key: &str, value: &toml::Value) -> String {
 	match value {
 		toml::Value::String(s) => format!("\"{}\"", s),
 		toml::Value::Integer(i) => i.to_string(),
@@ -23,17 +23,18 @@ fn value_to_rust(value: &toml::Value) -> String {
 		toml::Value::Boolean(b) => b.to_string(),
 		toml::Value::Array(arr) => {
 			let elements = arr.iter()
-							  .map(|v| value_to_rust(v))
+							  .map(|v| value_to_rust(section, key, v))
 							  .collect::<Vec<_>>()
 							  .join(", ");
 			format!("vec![{}]", elements)
 		},
 		toml::Value::Table(table) => {
+			let field_type = key.to_case(Case::Pascal);
 			let fields = table.iter()
-							  .map(|(k, v)| format!("{}: {}", k, value_to_rust(v)))
+							  .map(|(k, v)| format!("{}: {}", k, value_to_rust(section, key, v)))
 							  .collect::<Vec<_>>()
 							  .join(",\n\t");
-			format!("{{\n\t{}\n}}", fields) // Assuming you have a corresponding struct
+			format!("{}Config{}Type {{\n\t{}\n}}", section, field_type, fields) // Assuming you have a corresponding struct
 		},
 		// Handle other TOML types as needed
 		_ => panic!("Unsupported TOML value type"),
@@ -76,15 +77,15 @@ fn main() {
 			continue;
 		}
 
+		let name = section.to_case(Case::Upper);
+		let field_type = section.to_case(Case::Pascal);
 		let fields = items
 			.as_table()
 			.unwrap()
 			.into_iter()
-			.map(|(k, v)| format!("\t{}: {}", k, value_to_rust(v)))
+			.map(|(k, v)| format!("\t{}: {}", k, value_to_rust(&field_type, k, v)))
 			.collect::<Vec<String>>()
-			.join(",\n\t\t");
-		let name = section.to_case(Case::Upper);
-		let field_type = section.to_case(Case::Pascal);
+			.join(",\n\t");
 
 		writeln!(config, "\tpub static ref {0}: {1}Config = {1}Config {{\n\t{2},\n\t\t..Default::default()\n\t}};\n" , name, field_type, fields).unwrap();
 	}

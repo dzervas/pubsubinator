@@ -12,18 +12,18 @@ subscribers = [ "ble_hid", "usb_hid" ]
 middleware = [ "keymap", "keyboard_report" ]
 nrf_softdevice = true
 
-# [matrix]
-# inputs = [
-# 	{ pin = "P0_04", pull = "down" },
-# 	{ pin = "P0_30", pull = "down" },
-# 	{ pin = "P1_14", pull = "down" },
-# ]
-# outputs = [
-# 	{ pin = "P0_04", level = "low", drive = "standard" },
-# 	{ pin = "P0_30", level = "low", drive = "standard" },
-# 	{ pin = "P1_14", level = "low", drive = "standard" },
-# ]
-# direction = "row2col"
+[matrix]
+inputs = [
+	{ pin = "P0_04", pull = "down" },
+	{ pin = "P0_30", pull = "down" },
+	{ pin = "P1_14", pull = "down" },
+]
+outputs = [
+	{ pin = "P0_04", level = "low", drive = "standard" },
+	{ pin = "P0_30", level = "low", drive = "standard" },
+	{ pin = "P1_14", level = "low", drive = "standard" },
+]
+direction = "Row2Col"
 
 [keymap]
 # period = 2

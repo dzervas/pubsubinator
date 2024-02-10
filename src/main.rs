@@ -24,7 +24,7 @@ use core::mem;
 use core::mem::size_of;
 
 use defmt::*;
-use embassy_nrf::gpio::{AnyPin, Input, Level, Output, Pin, Pull};
+use embassy_nrf::gpio::{AnyPin, Input, Output};
 
 use embassy_executor::{task, Spawner};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
@@ -55,6 +55,7 @@ pub mod nrf;
 pub mod usb_hid;
 pub mod config_types;
 pub mod config;
+pub mod gpio;
 
 #[allow(unused_imports)]
 use crate::analog_nrf::Analog;
@@ -118,20 +119,21 @@ async fn main(spawner: Spawner) {
 
 	// --- Setup Matrix publisher ---
 
-	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>, _, _> =
-		make_static!(matrix::Matrix::new(
-			[
-				Input::new(p.P0_04.degrade(), Pull::Down),
-				Input::new(p.P0_30.degrade(), Pull::Down),
-				Input::new(p.P1_14.degrade(), Pull::Down),
-			],
-			[
-				Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-				Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-				Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-			],
-			matrix::MatrixDirection::Row2Col,
-		));
+	// let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>, _, _> =
+	// 	make_static!(matrix::Matrix::new(
+	// 		[
+	// 			Input::new(p.P0_04.degrade(), Pull::Down),
+	// 			Input::new(p.P0_30.degrade(), Pull::Down),
+	// 			Input::new(p.P1_14.degrade(), Pull::Down),
+	// 		],
+	// 		[
+	// 			Output::new(p.P0_03.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+	// 			Output::new(p.P0_28.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+	// 			Output::new(p.P0_29.degrade(), Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+	// 		],
+	// 		matrix::MatrixDirection::Row2Col,
+	// 	));
+	let matrix: &'static mut Matrix<'static, Input<'static, AnyPin>, Output<'static, AnyPin>> = make_static!(config::MATRIX.build());
 	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");
 

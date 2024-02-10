@@ -4,16 +4,19 @@ use core::pin::Pin;
 use crate::{PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use alloc::vec;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::pubsub::Publisher;
 use embedded_hal::digital::{InputPin, OutputPin};
 use futures::Future;
 use reactor::reactor_event::*;
 use reactor::{Polled, RPublisher};
+use strum::EnumString;
 
 pub const MATRIX_PERIOD: u64 = 2;
 // pub const HOLD_CYCLES: u8 = 200;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString)]
 pub enum MatrixDirection {
 	Col2Row,
 	Row2Col,
@@ -23,20 +26,20 @@ pub trait InputObj = InputPin<Error = Infallible>;
 pub trait OutputObj = OutputPin<Error = Infallible>;
 
 // TODO: Dynamic size
-pub struct Matrix<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> {
+pub struct Matrix<'a, I: InputObj, O: OutputObj> {
 	// TODO: Use slices instead of vectors
 	// TODO: Make these private and create platform-specific constructors
-	inputs: [I; IC],
-	outputs: [O; OC],
-	last_state: [[bool; OC]; IC],
+	inputs: Vec<I>,
+	outputs: Vec<O>,
+	last_state: Vec<Vec<bool>>,
 	direction: MatrixDirection,
 	channel:
 		Publisher<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
 }
 
-impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Matrix<'a, I, O, IC, OC> {
-	pub fn new(inputs: [I; IC], outputs: [O; OC], direction: MatrixDirection) -> Self {
-		let last_state = [[false; OC]; IC];
+impl<'a, I: InputObj, O: OutputObj> Matrix<'a, I, O> {
+	pub fn new(inputs: Vec<I>, outputs: Vec<O>, direction: MatrixDirection) -> Self {
+		let last_state = vec![vec![false; inputs.len()]; outputs.len()];
 
 		Self {
 			inputs,
@@ -60,9 +63,9 @@ impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Matrix<'a,
 	}
 }
 
-impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> RPublisher for Matrix<'a, I, O, IC, OC> {}
+impl<'a, I: InputObj, O: OutputObj> RPublisher for Matrix<'a, I, O> {}
 
-impl<'a, I: InputObj, O: OutputObj, const IC: usize, const OC: usize> Polled for Matrix<'a, I, O, IC, OC> {
+impl<'a, I: InputObj, O: OutputObj> Polled for Matrix<'a, I, O> {
 	fn poll(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
 		Box::pin(async move {
 			let mut event_buffer = Vec::new();

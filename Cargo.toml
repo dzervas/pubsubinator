@@ -15,6 +15,7 @@ embedded-hal-async = "1.0.0"
 embedded-hal-bus = "0.1.0"
 fixed = "1.24.0"
 heapless = "0.8.0"
+strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 
 [dependencies.embassy-executor]
 version = "0.5.0"
