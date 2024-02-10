@@ -633,7 +633,7 @@ dependencies = [
  "embassy-usb-driver",
  "heapless 0.8.0",
  "ssmarshal",
- "usbd-hid",
+ "usbd-hid 0.6.1",
 ]
 
 [[package]]
@@ -1509,7 +1509,7 @@ dependencies = [
  "strum",
  "toml",
  "usb-device 0.3.1",
- "usbd-hid",
+ "usbd-hid 0.7.0",
 ]
 
 [[package]]
@@ -2001,6 +2001,18 @@ dependencies = [
  "serde",
  "ssmarshal",
  "usb-device 0.2.9",
+ "usbd-hid-macros",
+]
+
+[[package]]
+name = "usbd-hid"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41a2d4546ca3e6a5c6a85584e5caf29feabf3ec35d6cd6b772eb35bd3cff7256"
+dependencies = [
+ "serde",
+ "ssmarshal",
+ "usb-device 0.3.1",
  "usbd-hid-macros",
 ]
 

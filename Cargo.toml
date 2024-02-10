@@ -93,7 +93,7 @@ features = ["defmt"]
 optional = true
 
 [dependencies.usbd-hid]
-version = "0.6.1"
+version = "0.7.0"
 features = []
 optional = true
 
