@@ -1,10 +1,12 @@
+use alloc::format;
 // We need to use alloc Vec, otherwise we can instatiate the KeymapConfig
 // without generics
 use alloc::vec::Vec;
+use defmt::println;
 use core::str::FromStr;
 use reactor::*;
 
-use crate::gpio::{Drive, Input, Level, Output, Pin, Pull};
+use crate::gpio::{Drive, Input, Level, Output, Pull};
 use crate::keymap_mid::*;
 use crate::matrix::{Matrix, MatrixDirection};
 
@@ -44,8 +46,8 @@ pub struct MatrixConfig {
 
 impl MatrixConfig {
 	pub fn build(&self) -> Matrix<Input, Output> {
-		let inputs = self.inputs.iter().map(|input| input.into()).collect::<Vec<Input>>();
-		let outputs = self.outputs.iter().map(|output| output.into()).collect::<Vec<Output>>();
+		let inputs = self.inputs.iter().map(|input| input.to_input()).collect::<Vec<Input>>();
+		let outputs = self.outputs.iter().map(|output| output.to_output()).collect::<Vec<Output>>();
 
 		Matrix::new(inputs, outputs, MatrixDirection::from_str(self.direction).unwrap())
 	}
@@ -57,11 +59,23 @@ pub struct MatrixConfigInputsType {
 	pub pull: &'static str,
 }
 
-impl<'a> Into<Input<'a>> for &MatrixConfigInputsType {
-	fn into(self) -> Input<'a> {
-		let pin = Pin::from_str(self.pin).unwrap();
+// TODO: Move the nrf-specific pin stuff to gpio.rs
+impl MatrixConfigInputsType {
+	fn to_input<'a>(self) -> Input<'a> {
 		let pull = Pull::from_str(self.pull).unwrap();
-		unsafe { pin.to_input(pull) }
+
+		let parts = self.pin.split('.');
+		let (port, pin) = if let [port_str, pin_str] = parts.into_iter().collect::<Vec<&str>>().as_slice() {
+			let port = port_str.parse::<u8>().expect(format!("Invalid port number for pin `{}`", self.pin).as_str());
+			let pin = pin_str.parse::<u8>().expect(format!("Invalid pin number for pin `{}`", self.pin).as_str());
+			(port, pin)
+		} else {
+			panic!("Invalid pin format `{}`", self.pin)
+		};
+		println!("input port: {}, pin: {}", port, pin);
+		let anypin = unsafe { embassy_nrf::gpio::AnyPin::steal(port * 32 + pin) };
+
+		embassy_nrf::gpio::Input::new(anypin, pull.into())
 	}
 }
 
@@ -72,11 +86,22 @@ pub struct MatrixConfigOutputsType {
 	pub level: &'static str,
 }
 
-impl<'a> Into<Output<'a>> for &MatrixConfigOutputsType {
-	fn into(self) -> Output<'a> {
-		let pin = Pin::from_str(self.pin).unwrap();
+impl MatrixConfigOutputsType {
+	fn to_output<'a>(self) -> Output<'a> {
 		let drive = Drive::from_str(self.drive).unwrap();
 		let level = Level::from_str(self.level).unwrap();
-		unsafe { pin.to_output(drive, level) }
+
+		let parts = self.pin.split('.');
+		let (port, pin) = if let [port_str, pin_str] = parts.into_iter().collect::<Vec<&str>>().as_slice() {
+			let port = port_str.parse::<u8>().expect(format!("Invalid port number for pin `{}`", self.pin).as_str());
+			let pin = pin_str.parse::<u8>().expect(format!("Invalid pin number for pin `{}`", self.pin).as_str());
+			(port, pin)
+		} else {
+			panic!("Invalid pin format `{}`", self.pin)
+		};
+		println!("output port: {}, pin: {}", port, pin);
+		let anypin = unsafe { embassy_nrf::gpio::AnyPin::steal(port * 32 + pin) };
+
+		embassy_nrf::gpio::Output::new(anypin, level.into(), drive.into())
 	}
 }

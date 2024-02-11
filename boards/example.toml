@@ -19,14 +19,14 @@ subscribers = [ "ble_hid", "usb_hid" ]
 
 [matrix]
 inputs = [
-	{ pin = "P0_04", pull = "down" },
-	{ pin = "P0_30", pull = "down" },
-	{ pin = "P1_14", pull = "down" },
+	{ pin = "0.04", pull = "Down" },
+	{ pin = "0.30", pull = "Down" },
+	{ pin = "1.14", pull = "Down" },
 ]
 outputs = [
-	{ pin = "P0_04", level = "low", drive = "standard" },
-	{ pin = "P0_30", level = "low", drive = "standard" },
-	{ pin = "P1_14", level = "low", drive = "standard" },
+	{ pin = "0.03", level = "Low", drive = "Standard" },
+	{ pin = "0.28", level = "Low", drive = "Standard" },
+	{ pin = "0.29", level = "Low", drive = "Standard" },
 ]
 direction = "Row2Col"
 

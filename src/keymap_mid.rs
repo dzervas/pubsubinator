@@ -31,9 +31,11 @@ pub struct Keymap {
 
 impl Keymap {
 	pub fn new(keymap: Vec<Vec<Vec<KeyCodeInt>>>, hold_cycles: u16) -> Self {
+		let last_state = vec![vec![(KeyEvent::Released(KeyCode::None), 0); keymap[0][0].len()]; keymap[0].len()];
 		Self {
 			layers: keymap,
 			hold_cycles,
+			last_state,
 			..Default::default()
 		}
 	}

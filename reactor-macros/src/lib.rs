@@ -48,7 +48,7 @@ pub fn subscribers_task(input: TokenStream) -> TokenStream {
 				// Expects subscriber to be a global but that's fine?
 				let mut listener = #channel.subscriber().unwrap();
 				let publisher = #channel.publisher().unwrap();
-				info!("Subscriber task started");
+				info!("Subscriber task started for subscribers: {} and middleware: {}", stringify!(#subscribers), stringify!(#middleware));
 
 				loop {
 					let msg = listener.next_message_pure().await;

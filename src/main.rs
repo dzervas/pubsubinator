@@ -106,6 +106,20 @@ async fn main(spawner: Spawner) {
 
 	// --- Setup Matrix publisher ---
 	let matrix = make_static!(config::MATRIX.build());
+	// let matrix: &'static mut matrix::Matrix<'static, embassy_nrf::gpio::Input<'static, embassy_nrf::gpio::AnyPin>, embassy_nrf::gpio::Output<'static, embassy_nrf::gpio::AnyPin>> =
+	// 	make_static!(matrix::Matrix::new(
+	// 		alloc::vec![
+	// 			embassy_nrf::gpio::Input::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 04) }, embassy_nrf::gpio::Pull::Down),
+	// 			embassy_nrf::gpio::Input::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 30) }, embassy_nrf::gpio::Pull::Down),
+	// 			embassy_nrf::gpio::Input::new(unsafe { embassy_nrf::gpio::AnyPin::steal(1 * 32 + 14) }, embassy_nrf::gpio::Pull::Down),
+	// 		],
+	// 		alloc::vec![
+	// 			embassy_nrf::gpio::Output::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 03) }, embassy_nrf::gpio::Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+	// 			embassy_nrf::gpio::Output::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 28) }, embassy_nrf::gpio::Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+	// 			embassy_nrf::gpio::Output::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 29) }, embassy_nrf::gpio::Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
+	// 		],
+	// 		matrix::MatrixDirection::Row2Col,
+	// 	));
 	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");
 
