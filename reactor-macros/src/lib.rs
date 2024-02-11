@@ -1,3 +1,4 @@
+#![feature(proc_macro_diagnostic)]
 extern crate proc_macro;
 
 use std::env;
@@ -107,22 +108,31 @@ pub fn subscribers_task_env(input: TokenStream) -> TokenStream {
 	let middleware = inputs.middleware;
 
 	// TODO: Make the text warnings compiler warnings
-	let subscribers_arr: Vec<syn::Ident> = env::var(subscribers.value())
-		.unwrap_or_else(|_| {
-			println!("WARNING: No subscribers configured - you can set subscribers in the config `global.subscribers`");
-			"".to_string()
-		})
-		.split(',')
-		.map(|s| syn::Ident::new(s, proc_macro2::Span::call_site()))
-		.collect();
-	let middleware_arr: Vec<syn::Ident> = env::var(middleware.value())
-		.unwrap_or_else(|_| {
+	let subscribers_arr: Vec<syn::Ident> = match env::var(subscribers.value()) {
+		Ok(val) if !val.trim().is_empty() => {
+			val.split(',')
+				.map(|s| syn::Ident::new(s.trim(), proc_macro2::Span::call_site()))
+				.collect()
+		},
+		_ => {
+			println!("WARNING: No subscribers configured - you can set middleware in the config `global.subscribers`");
+			// subscribers.span().unwrap().warning("No subscribers configured - you can set middleware in the config `global.subscribers`");
+			Vec::new() // Return an empty vector if the env var is not set or is empty
+		},
+	};
+	let middleware_arr: Vec<syn::Ident> = match env::var(middleware.value()) {
+		Ok(val) if !val.trim().is_empty() => {
+			val.split(',')
+				.map(|s| syn::Ident::new(s.trim(), proc_macro2::Span::call_site()))
+				.collect()
+		},
+		_ => {
 			println!("WARNING: No middleware configured - you can set middleware in the config `global.middleware`");
-			"".to_string()
-		})
-		.split(',')
-		.map(|s| syn::Ident::new(s, proc_macro2::Span::call_site()))
-		.collect();
+			// middleware.span().unwrap().warning("No middleware configured - you can set middleware in the config `global.middleware`");
+			Vec::new() // Return an empty vector if the env var is not set or is empty
+		},
+	};
+
 
 	// Generate the output TokenStream with the array of identifiers
 	let output = quote! {
