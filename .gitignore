@@ -2,3 +2,4 @@
 rustc-ice-*
 *.dtb
 src/config.rs
+target/

@@ -1,9 +1,11 @@
 extern crate proc_macro;
 
+use std::env;
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{Expr, ExprArray, Result};
+use syn::{Expr, ExprArray, LitStr, Result};
 
 struct SubscribersTaskInput {
 	channel: Expr,
@@ -72,4 +74,60 @@ pub fn subscribers_task(input: TokenStream) -> TokenStream {
 	};
 
 	TokenStream::from(expanded)
+}
+
+struct SubscribersTaskEnvInput {
+	channel: Expr,
+	subscribers: LitStr,
+	middleware: LitStr,
+}
+
+impl Parse for SubscribersTaskEnvInput {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let channel: Expr = input.parse()?;
+		input.parse::<syn::token::Comma>()?;
+		let subscribers: LitStr = input.parse()?;
+		input.parse::<syn::token::Comma>()?;
+		let middleware: LitStr = input.parse()?;
+
+		Ok(Self {
+			channel,
+			subscribers,
+			middleware,
+		})
+	}
+}
+
+#[proc_macro]
+pub fn subscribers_task_env(input: TokenStream) -> TokenStream {
+	let inputs = syn::parse_macro_input!(input as SubscribersTaskEnvInput);
+
+	let channel = inputs.channel;
+	let subscribers = inputs.subscribers;
+	let middleware = inputs.middleware;
+
+	// TODO: Make the text warnings compiler warnings
+	let subscribers_arr: Vec<syn::Ident> = env::var(subscribers.value())
+		.unwrap_or_else(|_| {
+			println!("WARNING: No subscribers configured - you can set subscribers in the config `global.subscribers`");
+			"".to_string()
+		})
+		.split(',')
+		.map(|s| syn::Ident::new(s, proc_macro2::Span::call_site()))
+		.collect();
+	let middleware_arr: Vec<syn::Ident> = env::var(middleware.value())
+		.unwrap_or_else(|_| {
+			println!("WARNING: No middleware configured - you can set middleware in the config `global.middleware`");
+			"".to_string()
+		})
+		.split(',')
+		.map(|s| syn::Ident::new(s, proc_macro2::Span::call_site()))
+		.collect();
+
+	// Generate the output TokenStream with the array of identifiers
+	let output = quote! {
+		reactor_macros::subscribers_task!(#channel, [#(#subscribers_arr),*], [#(#middleware_arr),*])
+	};
+
+	TokenStream::from(output)
 }

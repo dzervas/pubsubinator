@@ -60,7 +60,7 @@ fn handle_global_section(key: &str, value: &toml::Value) {
 				.as_array()
 				.unwrap()
 				.iter()
-				.map(|v| v.to_string())
+				.map(|v| v.to_string().replace("\"", ""))
 				.collect::<Vec<String>>()
 				.join(",");
 			println!("cargo:rustc-env=PUBSUB_{}={}", key.to_uppercase(), joined);

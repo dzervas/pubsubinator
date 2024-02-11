@@ -21,6 +21,7 @@ use lazy_static::lazy_static;
 use matrix::MATRIX_PERIOD;
 use reactor::reactor_event::ReactorEvent;
 use reactor::Polled;
+use reactor_macros::subscribers_task_env;
 use static_cell::make_static;
 
 use embedded_alloc::Heap;
@@ -188,7 +189,7 @@ async fn main(spawner: Spawner) {
 
 	spawner.spawn(ble_hid_task(sd, server)).unwrap();
 
-	let subs_task = reactor_macros::subscribers_task!(CHANNEL, [ble_hid, usb_hid], [keymap, keyboard_report]);
+	let subs_task = subscribers_task_env!(CHANNEL, "PUBSUB_SUBSCRIBERS", "PUBSUB_MIDDLEWARE");
 	spawner.spawn(subs_task).unwrap();
 }
 
