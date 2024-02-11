@@ -54,6 +54,7 @@ fn handle_global_section(key: &str, value: &toml::Value) {
 			.as_array()
 			.unwrap()
 			.iter()
+			// TODO: Doesn't work
 			.for_each(|v| println!("cargo:rustc-cfg={}", v.as_str().unwrap())),
 		"publishers" | "middleware" | "subscribers" => {
 			let joined = value
@@ -88,7 +89,7 @@ fn main() {
 
 	let board_path = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("boards")
-		.join("example.toml");
+		.join(option_env!("BOARD_CONFIG").unwrap_or("example").to_owned() + ".toml");
 	let board = fs::read_to_string(&board_path)
 		.expect(format!("Could not read config file {}", (&board_path).to_str().unwrap()).as_str());
 	println!("cargo:rerun-if-changed={:?}", board_path);

@@ -2,8 +2,8 @@ use alloc::format;
 // We need to use alloc Vec, otherwise we can instatiate the KeymapConfig
 // without generics
 use alloc::vec::Vec;
-use defmt::println;
 use core::str::FromStr;
+use defmt::println;
 use reactor::*;
 
 use crate::gpio::{Drive, Input, Level, Output, Pull};
@@ -47,7 +47,11 @@ pub struct MatrixConfig {
 impl MatrixConfig {
 	pub fn build(&self) -> Matrix<Input, Output> {
 		let inputs = self.inputs.iter().map(|input| input.to_input()).collect::<Vec<Input>>();
-		let outputs = self.outputs.iter().map(|output| output.to_output()).collect::<Vec<Output>>();
+		let outputs = self
+			.outputs
+			.iter()
+			.map(|output| output.to_output())
+			.collect::<Vec<Output>>();
 
 		Matrix::new(inputs, outputs, MatrixDirection::from_str(self.direction).unwrap())
 	}
@@ -66,8 +70,12 @@ impl MatrixConfigInputsType {
 
 		let parts = self.pin.split('.');
 		let (port, pin) = if let [port_str, pin_str] = parts.into_iter().collect::<Vec<&str>>().as_slice() {
-			let port = port_str.parse::<u8>().expect(format!("Invalid port number for pin `{}`", self.pin).as_str());
-			let pin = pin_str.parse::<u8>().expect(format!("Invalid pin number for pin `{}`", self.pin).as_str());
+			let port = port_str
+				.parse::<u8>()
+				.expect(format!("Invalid port number for pin `{}`", self.pin).as_str());
+			let pin = pin_str
+				.parse::<u8>()
+				.expect(format!("Invalid pin number for pin `{}`", self.pin).as_str());
 			(port, pin)
 		} else {
 			panic!("Invalid pin format `{}`", self.pin)
@@ -93,8 +101,12 @@ impl MatrixConfigOutputsType {
 
 		let parts = self.pin.split('.');
 		let (port, pin) = if let [port_str, pin_str] = parts.into_iter().collect::<Vec<&str>>().as_slice() {
-			let port = port_str.parse::<u8>().expect(format!("Invalid port number for pin `{}`", self.pin).as_str());
-			let pin = pin_str.parse::<u8>().expect(format!("Invalid pin number for pin `{}`", self.pin).as_str());
+			let port = port_str
+				.parse::<u8>()
+				.expect(format!("Invalid port number for pin `{}`", self.pin).as_str());
+			let pin = pin_str
+				.parse::<u8>()
+				.expect(format!("Invalid pin number for pin `{}`", self.pin).as_str());
 			(port, pin)
 		} else {
 			panic!("Invalid pin format `{}`", self.pin)
