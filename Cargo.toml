@@ -13,7 +13,7 @@ embedded-alloc = "0.5.1"
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
 embedded-hal-bus = "0.1.0"
-fixed = "1.24.0"
+fixed = "1.25.1"
 heapless = "0.8.0"
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 
