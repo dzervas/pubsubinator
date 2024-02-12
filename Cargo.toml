@@ -8,6 +8,7 @@ cortex-m = "0.7.7"
 cortex-m-rt = "0.7.3"
 defmt = "0.3"
 defmt-rtt = "0.4"
+ekv = { git = "https://github.com/embassy-rs/ekv", version = "0.1.0", features = ["crc", "defmt", "page-size-2048", "max-page-count-2048"] }
 embassy-futures = "0.1.1"
 embedded-alloc = "0.5.1"
 embedded-hal = "1.0.0"
@@ -19,11 +20,11 @@ strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 
 [dependencies.embassy-executor]
 version = "0.5.0"
-features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"]
+features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers", "nightly"]
 
 [dependencies.embassy-nrf]
 version = "0.1.0"
-features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time"]
+features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time", "qspi-multiwrite-flash"]
 optional = true
 
 [dependencies.embassy-rp]
@@ -105,6 +106,7 @@ nrf52840 = ["nrf"]
 rp = ["dep:embassy-rp"]
 stm32 = ["dep:embassy-stm32"]
 usb = ["dep:embassy-usb", "dep:usbd-hid", "dep:usb-device"]
+database-format = []
 
 [profile.release]
 opt-level = "z"

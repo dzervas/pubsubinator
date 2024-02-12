@@ -32,13 +32,15 @@ static HEAP: Heap = Heap::empty();
 
 use embassy_nrf::interrupt::Priority;
 use embassy_nrf::usb::vbus_detect::SoftwareVbusDetect;
-use embassy_nrf::{bind_interrupts, peripherals, saadc, usb};
+use embassy_nrf::{bind_interrupts, pac, peripherals, qspi, rng, saadc, usb};
 use nrf_softdevice::{raw, SocEvent, Softdevice};
 
 pub mod analog_nrf;
 pub mod ble_hid;
 pub mod config;
 pub mod config_types;
+pub mod data;
+pub mod flash_nrf;
 pub mod gpio;
 pub mod keyboard_report_mid;
 pub mod keymap_mid;
@@ -55,6 +57,8 @@ use crate::usb_hid::UsbHid;
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;
 	SAADC => saadc::InterruptHandler;
+	QSPI => qspi::InterruptHandler<peripherals::QSPI>;
+	RNG => rng::InterruptHandler<peripherals::RNG>;
 });
 
 pub const PUBSUB_CAPACITY: usize = 20 * size_of::<ReactorEvent>();
@@ -99,27 +103,25 @@ async fn main(spawner: Spawner) {
 		unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) }
 	}
 
+	unsafe {
+		let nvmc = &*pac::NVMC::ptr();
+		let power = &*pac::POWER::ptr();
+
+		// Enable DC-DC
+		power.dcdcen.write(|w| w.dcdcen().enabled());
+
+		// Enable flash cache
+		nvmc.icachecnf.write(|w| w.cacheen().enabled());
+	}
+
 	let mut config = embassy_nrf::config::Config::default();
 	config.gpiote_interrupt_priority = Priority::P2;
 	config.time_interrupt_priority = Priority::P2;
+	// config.dcdc = DcdcConfig { reg0: false, reg1: true };
 	let p = embassy_nrf::init(config);
 
 	// --- Setup Matrix publisher ---
 	let matrix = make_static!(config::MATRIX.build());
-	// let matrix: &'static mut matrix::Matrix<'static, embassy_nrf::gpio::Input<'static, embassy_nrf::gpio::AnyPin>, embassy_nrf::gpio::Output<'static, embassy_nrf::gpio::AnyPin>> =
-	// 	make_static!(matrix::Matrix::new(
-	// 		alloc::vec![
-	// 			embassy_nrf::gpio::Input::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 04) }, embassy_nrf::gpio::Pull::Down),
-	// 			embassy_nrf::gpio::Input::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 30) }, embassy_nrf::gpio::Pull::Down),
-	// 			embassy_nrf::gpio::Input::new(unsafe { embassy_nrf::gpio::AnyPin::steal(1 * 32 + 14) }, embassy_nrf::gpio::Pull::Down),
-	// 		],
-	// 		alloc::vec![
-	// 			embassy_nrf::gpio::Output::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 03) }, embassy_nrf::gpio::Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 			embassy_nrf::gpio::Output::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 28) }, embassy_nrf::gpio::Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 			embassy_nrf::gpio::Output::new(unsafe { embassy_nrf::gpio::AnyPin::steal(0 * 32 + 29) }, embassy_nrf::gpio::Level::Low, embassy_nrf::gpio::OutputDrive::Standard),
-	// 		],
-	// 		matrix::MatrixDirection::Row2Col,
-	// 	));
 	spawner.spawn(poller_task(matrix)).unwrap();
 	info!("Matrix publisher initialized");
 
@@ -186,7 +188,28 @@ async fn main(spawner: Spawner) {
 		..Default::default()
 	};
 
+	// --- Set the session seed ---
+	// TODO: This crashes with `sd_softdevice_enable err SdmIncorrectInterruptConfiguration`
+	// let mut rng = embassy_nrf::rng::Rng::new(p.RNG, crate::Irqs);
+	// let session_seed = rng.next_u32();
+	// TODO: For some reason dropping silently crashes - has to do with the SoftDevice?
+	// drop(rng); // Release the RNG as soon as possible
+
 	let sd = Softdevice::enable(&sd_config);
+
+	// --- Setup EKV DB ---
+	let mut flash = flash_nrf::Flash::new().await;
+	let mut db_config = ekv::Config::default();
+	db_config.random_seed = 0xDEADBEEF;
+	let mut db = ekv::Database::<_, CriticalSectionRawMutex>::new(&mut flash, db_config);
+
+	#[cfg(feature = "database-format")]
+	{
+		info!("Formatting EKV Database");
+		db.format().await.unwrap();
+		info!("EKV Database formatted");
+	}
+
 	let server = make_static!(ble_hid::Server::new(sd).unwrap());
 	server.init();
 
@@ -194,7 +217,6 @@ async fn main(spawner: Spawner) {
 	let ble_hid = make_static!(BleHid {
 		softdevice: sd,
 		server,
-		security_handler: make_static!(ble_hid::Bonder::default()),
 		channel: CHANNEL.subscriber().unwrap(),
 	});
 

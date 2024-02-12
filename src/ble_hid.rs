@@ -402,7 +402,6 @@ pub struct BleHid<'a> {
 	pub server: &'a Server,
 	pub channel:
 		Subscriber<'a, CriticalSectionRawMutex, ReactorEvent, PUBSUB_CAPACITY, PUBSUB_SUBSCRIBERS, PUBSUB_PUBLISHERS>,
-	pub security_handler: &'static Bonder,
 }
 
 impl<'a> BleHid<'a> {

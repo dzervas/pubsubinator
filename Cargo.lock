@@ -368,6 +368,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11157ac094ffbdde99aa67b23417ebdd801842852b500e395a45a9c0aac03e4a"
 
 [[package]]
+name = "ekv"
+version = "0.1.0"
+source = "git+https://github.com/embassy-rs/ekv#84ebfc9db7c74599219828ca83457b380d45d7f7"
+dependencies = [
+ "defmt",
+ "embassy-sync 0.5.0",
+ "heapless 0.8.0",
+]
+
+[[package]]
 name = "embassy-embedded-hal"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1468,6 +1478,7 @@ dependencies = [
  "cortex-m-rt",
  "defmt",
  "defmt-rtt",
+ "ekv",
  "embassy-executor",
  "embassy-futures",
  "embassy-nrf",

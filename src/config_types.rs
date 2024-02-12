@@ -3,7 +3,6 @@ use alloc::format;
 // without generics
 use alloc::vec::Vec;
 use core::str::FromStr;
-use defmt::println;
 use reactor::*;
 
 use crate::gpio::{Drive, Input, Level, Output, Pull};
@@ -80,7 +79,6 @@ impl MatrixConfigInputsType {
 		} else {
 			panic!("Invalid pin format `{}`", self.pin)
 		};
-		println!("input port: {}, pin: {}", port, pin);
 		let anypin = unsafe { embassy_nrf::gpio::AnyPin::steal(port * 32 + pin) };
 
 		embassy_nrf::gpio::Input::new(anypin, pull.into())
@@ -111,7 +109,6 @@ impl MatrixConfigOutputsType {
 		} else {
 			panic!("Invalid pin format `{}`", self.pin)
 		};
-		println!("output port: {}, pin: {}", port, pin);
 		let anypin = unsafe { embassy_nrf::gpio::AnyPin::steal(port * 32 + pin) };
 
 		embassy_nrf::gpio::Output::new(anypin, level.into(), drive.into())

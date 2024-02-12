@@ -8,10 +8,10 @@
 			"type": "probe-rs-debug",
 			"request": "launch",
 			"preLaunchTask": "rust: cargo build",
-			"name": "probe-rs Test",
+			"name": "Run",
 			"cwd": "${workspaceFolder}",
 			"connectUnderReset": false,
-			"runtimeExecutable": "/home/dzervas/.cargo/bin/probe-rs",
+			"runtimeExecutable": "${env:HOME}/.cargo/bin/probe-rs",
 			"chip": "nRF52840_xxAA",
 			"consoleLogLevel": "Console",
 			"flashingConfig": {
@@ -20,23 +20,24 @@
 			},
 			"coreConfigs": [{
 				"coreIndex": 0,
+				"rttEnabled": true,
 				"programBinary": "target/thumbv7em-none-eabi/debug/${workspaceFolderBasename}",
-				// "rttChannelFormats": [
-				// 	{
-				// 		"channelNumber": 0,
-				// 		"dataFormat": "String", // Format RTT data as String data
-				// 		"showTimestamps": true // Include host-side timestamps for every line of data transferred from the target RTT output
-				// 	},
-				// 	{
-				// 		"channelNumber": 1,
-				// 		"dataFormat": "BinaryLE" // Treat data as raw binary data, and do not format in any way
-				// 	}
-				// ]
+				"rttChannelFormats": [
+					{
+						"channelNumber": 0,
+						"dataFormat": "String", // Format RTT data as String data
+						"showTimestamps": true // Include host-side timestamps for every line of data transferred from the target RTT output
+					},
+					{
+						"channelNumber": 1,
+						"dataFormat": "BinaryLE" // Treat data as raw binary data, and do not format in any way
+					}
+				]
 			}],
 			"env": {
-				// 	"RUST_BACKTRACE": "1",
+				"RUST_BACKTRACE": "1",
 				"RUST_LOG": "probe_rs=info",
-				"DEFMT_LOG": "info"
+				"DEFMT_LOG": "trace"
 			}
 		}
 	]
