@@ -4,6 +4,7 @@ use core::pin::Pin;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use ekv::Database;
 use embassy_executor::task;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMutex};
 use embassy_sync::mutex::Mutex;
@@ -27,7 +28,7 @@ use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
 
-use crate::{PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
+use crate::{flash_nrf, PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 use reactor::reactor_event::*;
 use reactor::RSubscriber;
 
@@ -143,9 +144,9 @@ pub const REPORT_MAP: &[u8] = hid!(
 );
 
 #[task]
-pub async fn ble_hid_task(sd: &'static Softdevice, server: &'static Server) {
+pub async fn ble_hid_task(sd: &'static Softdevice, server: &'static Server, db: &'static mut Database<&mut crate::Flash, CriticalSectionRawMutex>) {
 	info!("BLE HID task started");
-	let security_handler = make_static!(Bonder::default());
+	let security_handler = make_static!(Bonder::new(db));
 
 	loop {
 		info!("Waiting for connection");
@@ -492,13 +493,15 @@ struct Peer {
 pub struct Bonder {
 	peer: Cell<Option<Peer>>,
 	sys_attrs: RefCell<Vec<u8>>,
+	db: &'static mut Database<&'static mut crate::Flash, CriticalSectionRawMutex>,
 }
 
-impl Default for Bonder {
-	fn default() -> Self {
+impl Bonder {
+	pub fn new(db: &'static mut Database<&'static mut crate::Flash, CriticalSectionRawMutex>) -> Self {
 		Bonder {
 			peer: Cell::new(None),
 			sys_attrs: Default::default(),
+			db,
 		}
 	}
 }
@@ -547,11 +550,12 @@ impl SecurityHandler for Bonder {
 
 		// In a real application you would want to signal another task to permanently store the keys in non-volatile memory here.
 		self.sys_attrs.borrow_mut().clear();
-		self.peer.set(Some(Peer {
+		let peer = Peer {
 			master_id,
 			key,
 			peer_id,
-		}));
+		};
+		self.peer.set(Some(peer));
 	}
 
 	fn get_key(&self, _conn: &nrf_softdevice::ble::Connection, master_id: MasterId) -> Option<EncryptionInfo> {

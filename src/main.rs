@@ -61,6 +61,7 @@ bind_interrupts!(struct Irqs {
 	RNG => rng::InterruptHandler<peripherals::RNG>;
 });
 
+pub type Flash = flash_nrf::Flash<'static>;
 pub const PUBSUB_CAPACITY: usize = 20 * size_of::<ReactorEvent>();
 pub const PUBSUB_SUBSCRIBERS: usize = 4;
 pub const PUBSUB_PUBLISHERS: usize = 4;
@@ -198,10 +199,10 @@ async fn main(spawner: Spawner) {
 	let sd = Softdevice::enable(&sd_config);
 
 	// --- Setup EKV DB ---
-	let mut flash = flash_nrf::Flash::new().await;
+	let mut flash = make_static!(flash_nrf::Flash::new().await);
 	let mut db_config = ekv::Config::default();
 	db_config.random_seed = 0xDEADBEEF;
-	let mut db = ekv::Database::<_, CriticalSectionRawMutex>::new(&mut flash, db_config);
+	let mut db = make_static!(ekv::Database::<_, CriticalSectionRawMutex>::new(flash, db_config));
 
 	#[cfg(feature = "database-format")]
 	{
@@ -223,7 +224,7 @@ async fn main(spawner: Spawner) {
 	spawner.spawn(softdevice_task(sd)).unwrap();
 	info!("SoftDevice initialized");
 
-	spawner.spawn(ble_hid_task(sd, server)).unwrap();
+	spawner.spawn(ble_hid_task(sd, server, db)).unwrap();
 
 	let subs_task = subscribers_task_env!(CHANNEL, "PUBSUB_SUBSCRIBERS", "PUBSUB_MIDDLEWARE");
 	spawner.spawn(subs_task).unwrap();
