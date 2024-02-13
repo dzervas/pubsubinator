@@ -4,6 +4,7 @@
 #![feature(type_alias_impl_trait)]
 
 extern crate alloc;
+#[cfg(feature = "debug")]
 extern crate defmt_rtt;
 extern crate embassy_nrf;
 extern crate panic_probe;

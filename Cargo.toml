@@ -5,108 +5,89 @@ edition = "2021"
 version = "0.1.2"
 
 [dependencies]
+# Base embedded stuff
 cortex-m = "0.7.7"
 cortex-m-rt = "0.7.3"
-defmt = "0.3"
-defmt-rtt = "0.4"
-ekv = { git = "https://github.com/embassy-rs/ekv", version = "0.1.0", features = ["crc", "defmt", "page-size-2048", "max-page-count-2048"] }
-embassy-futures = "0.1.1"
 embedded-alloc = "0.5.1"
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
 embedded-hal-bus = "0.1.0"
+
+# Debug
+defmt = "0.3"
+defmt-rtt = { version = "0.4", optional = true}
+
+# Embassy
+ekv = { git = "https://github.com/embassy-rs/ekv", version = "0.1.0", features = ["crc", "defmt", "page-size-2048", "max-page-count-2048"] }
+embassy-executor = { version = "0.5.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers", "nightly"] }
+embassy-futures = "0.1.1"
+embassy-sync = "0.5.0"
+embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"] }
+embassy-usb = { version = "0.1.0", features = ["defmt"], optional = true }
+
+# Target specific
+embassy-nrf = { version = "0.1.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time", "qspi-multiwrite-flash"], optional = true }
+embassy-rp = { version = "0.1.0", optional = true }
+embassy-stm32 = { version = "0.1.0", optional = true }
+
+# Rust stuff
+futures = { version = "0.3.30", features = ["async-await"], default-features = false }
 fixed = "1.25.1"
 heapless = "0.8.0"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+panic-probe = { version = "0.3.1", tures = ["defmt", "defmt-error", "print-defmt"] }
+rand = { version = "0.8.5", default-features = false }
+static_cell = { version = "2.0.0", features = ["nightly"] }
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 
-[dependencies.embassy-executor]
-version = "0.5.0"
-features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers", "nightly"]
+reactor = { version = "0.1.0", path = "reactor" }
+reactor-macros = { version = "0.1.0", path = "reactor-macros" }
 
-[dependencies.embassy-nrf]
-version = "0.1.0"
-features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time", "qspi-multiwrite-flash"]
-optional = true
+# USB
+usb-device = { version = "0.3.1", features = ["defmt"], optional = true }
+usbd-hid = { version = "0.6.1", optional = true }
 
-[dependencies.embassy-rp]
-version = "0.1.0"
-features = []
-optional = true
-
-[dependencies.embassy-stm32]
-version = "0.1.0"
-features = []
-optional = true
-
-[dependencies.embassy-sync]
-version = "0.5.0"
-features = []
-
-[dependencies.embassy-time]
-version = "0.3.0"
-features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"]
-
-[dependencies.embassy-usb]
-version = "0.1.0"
-features = ["defmt"]
-optional = true
-
-[dependencies.futures]
-version = "0.3.30"
-features = ["async-await"]
-default-features = false
-
-[dependencies.lazy_static]
-version = "1.4.0"
-features = ["spin_no_std"]
-
-[dependencies.nrf-softdevice]
-version = "0.1.0"
-features = ["ble-sec", "ble-gatt", "ble-gatt-server", "ble-peripheral", "nrf52840", "ble-l2cap", "defmt", "nrf-softdevice-s140", "critical-section-impl", "s140", "ble-rssi", "usable-from-interrupts", "nrf52840-pac", "ble-gatt-client"]
-optional = true
-default-features = false
-
-[dependencies.panic-probe]
-version = "0.3.1"
-features = ["defmt", "defmt-error", "print-defmt"]
-
-[dependencies.rand]
-version = "0.8.5"
-features = []
-default-features = false
-
-[dependencies.reactor]
-version = "0.1.0"
-path = "reactor"
-features = []
-
-[dependencies.reactor-macros]
-version = "0.1.0"
-path = "reactor-macros"
-features = []
-
-[dependencies.static_cell]
-version = "2.0.0"
-features = ["nightly"]
-
-[dependencies.usb-device]
-version = "0.3.1"
-features = ["defmt"]
-optional = true
-
-[dependencies.usbd-hid]
-version = "0.6.1"
-features = []
-optional = true
+# Bluetooth
+nrf-softdevice = { version = "0.1.0", features = ["ble-sec", "ble-gatt", "ble-gatt-server", "ble-peripheral", "nrf52840", "ble-l2cap", "defmt", "nrf-softdevice-s140", "critical-section-impl", "s140", "ble-rssi", "usable-from-interrupts", "nrf52840-pac", "ble-gatt-client"], optional = true, default-features = false }
 
 [features]
-ble = ["dep:nrf-softdevice"]
-default = ["nrf52840", "ble", "usb"]
+default = [
+	"debug",
+	"nrf52840",
+	"ble",
+	"usb"
+]
+
 nrf = ["dep:embassy-nrf", "dep:nrf-softdevice"]
 nrf52840 = ["nrf"]
+
 rp = ["dep:embassy-rp"]
+
 stm32 = ["dep:embassy-stm32"]
+
 usb = ["dep:embassy-usb", "dep:usbd-hid", "dep:usb-device"]
+ble = ["dep:nrf-softdevice"]
+
+# defmt
+debug = [ "defmt", "dep:defmt-rtt" ]
+defmt = [
+	"ekv/defmt",
+	"embassy-executor/defmt",
+	"embassy-time/defmt",
+	"embassy-time/defmt-timestamp-uptime",
+	"embassy-usb/defmt",
+	# TODO: When debug + nrf, rp or stm32 is enabled, add these
+	"embassy-nrf/defmt",
+	# "embassy-rp/defmt",
+	# "embassy-stm32/defmt",
+	# TODO: When debug + nrf-softdevice is enabled, add these
+	"nrf-softdevice/defmt",
+	"panic-probe/defmt",
+	# TODO: When debug + usb is enabled, add these
+	"usb-device/defmt"
+]
+
+# operations
 database-format = []
 
 [profile.release]
