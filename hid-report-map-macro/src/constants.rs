@@ -1,3 +1,16 @@
+#[repr(u16)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum CollectionID {
+	Physical = 0x00,
+	Application = 0x01,
+	Logical = 0x02,
+	Report = 0x03,
+	NamedArray = 0x04,
+	UsageSwitch = 0x05,
+	UsageModifier = 0x06,
+	// TODO: Complete the list, got from https://github.com/twitchyliquid64/usbd-hid/blob/581de99132815df6f673a4bff8193b14ad9186c5/macros/src/spec.rs#L155
+}
+
 // All of the constants are from the USB HID Usage Tables 1.12 PDF: https://usb.org/sites/default/files/hut1_2.pdf
 // To turn table from the PDF into enum easily use CyberChef with the following recipe:
 // https://gchq.github.io/CyberChef/#recipe=Find_/_Replace(%7B'option':'Regex','string':'%5C%5C%2B'%7D,'Plus',true,false,true,false)Find_/_Replace(%7B'option':'Regex','string':'%5E(%5B0-9a-fA-F%5D%7B2,4%7D)(?:-(%5B0-9a-fA-F%5D%2B))?%20(%5B%20%2B%5C%5C/%5C%5Cw-%5D%2B)(?:.?,?(?:%5C%5C(.*%5C%5C))?%20(?:%5C%5C%5B%5C%5Cd%2B%5C%5C%5D,?%20)?%5B%5C%5C/%5C%5Cw%5D%2B%20(?:%5C%5Cd%2B%5C%5C.?)%2B)?$'%7D,'%5C%5Ct$3%20%3D%200x$1,$2',true,false,true,false)Find_/_Replace(%7B'option':'Regex','string':'%5B%20/-%5D'%7D,'',true,false,true,false)Find_/_Replace(%7B'option':'Regex','string':'Reserved%3D(0x%5B0-9a-fA-F%5D%2B),(%5B0-9a-fA-F%5D%2B)'%7D,'//%20$1-0x$2%20Reserved',true,false,true,false)Find_/_Replace(%7B'option':'Regex','string':'(%5C%5Cw)%3D(%5C%5Cw)'%7D,'$1%20%3D%20$2',true,false,true,false)Find_/_Replace(%7B'option':'Regex','string':'%5E%5C%5Cd%2B$%5C%5Cn'%7D,'',true,false,true,false)Find_/_Replace(%7B'option':'Regex','string':'%5E%5C%5Ct(%5C%5Cd%2B)(%5C%5Cw%2B)%20%3D%20'%7D,'%5C%5Ct$2$1%20%3D%20',true,false,true,false)
@@ -156,8 +169,8 @@ pub enum GenericDesktopUsageID {
 	SystemDisplayExternal = 0xB2,
 	SystemDisplayBoth = 0xB3,
 	SystemDisplayDual = 0xB4,
-	SystemDisplayToggleInt/ExtMode = 0xB5,
-	SystemDisplaySwapPrimary/Secondary = 0xB6,
+	SystemDisplayToggleIntExtMode = 0xB5,
+	SystemDisplaySwapPrimarySecondary = 0xB6,
 	SystemDisplayToggleLCDAutoscale = 0xB7,
 	// 0xB8-0xBF Reserved
 	SensorZone = 0xC0,
@@ -210,7 +223,7 @@ pub enum SimulationControlsUsageID {
 	// 0x26-0xAF Reserved
 	Aileron = 0xB0,
 	AileronTrim = 0xB1,
-	Anti-TorqueControl = 0xB2,
+	AntiTorqueControl = 0xB2,
 	AutopilotEnable = 0xB3,
 	ChaffRelease = 0xB4,
 	CollectiveControl = 0xB5,

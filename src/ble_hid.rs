@@ -28,7 +28,7 @@ use usbd_hid::descriptor::KeyboardReport;
 
 use defmt::*;
 
-use crate::{flash_nrf, PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
+use crate::{PUBSUB_CAPACITY, PUBSUB_PUBLISHERS, PUBSUB_SUBSCRIBERS};
 use reactor::reactor_event::*;
 use reactor::RSubscriber;
 
@@ -79,11 +79,12 @@ const KEYBOARD_ID: u8 = 0x01;
 const MEDIA_KEYS_ID: u8 = 0x02;
 
 pub const REPORT_MAP: &[u8] = hid!(
-	(USAGE_PAGE, 0x01), // USAGE_PAGE (Generic Desktop Ctrls)
-	(USAGE, 0x06),      // USAGE (Keyboard)
-	(COLLECTION, 0x01), // COLLECTION (Application)
 	// ------------------------------------------------- Keyboard
-	(REPORT_ID, KEYBOARD_ID), //   REPORT_ID (1)
+	(USAGE_PAGE, 0x01),        // USAGE_PAGE (Generic Desktop Ctrls)
+	(USAGE, 0x06),             // USAGE (Keyboard)
+	(COLLECTION, 0x01),        // COLLECTION (Application)
+	(REPORT_ID, KEYBOARD_ID),  // REPORT_ID (1)
+
 	(USAGE_PAGE, 0x07),       //   USAGE_PAGE (Kbrd/Keypad)
 	(USAGE_MINIMUM, 0xE0),    //   USAGE_MINIMUM (0xE0)
 	(USAGE_MAXIMUM, 0xE7),    //   USAGE_MAXIMUM (0xE7)
@@ -97,6 +98,7 @@ pub const REPORT_MAP: &[u8] = hid!(
 	(HIDINPUT, 0x01),         //   INPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
 	(REPORT_COUNT, 0x05),     //   REPORT_COUNT (5) ; 5 bits (Num lock, Caps lock, Scroll lock, Compose, Kana)
 	(REPORT_SIZE, 0x01),      //   REPORT_SIZE (1)
+
 	(USAGE_PAGE, 0x08),       //   USAGE_PAGE (LEDs)
 	(USAGE_MINIMUM, 0x01),    //   USAGE_MINIMUM (0x01) ; Num Lock
 	(USAGE_MAXIMUM, 0x05),    //   USAGE_MAXIMUM (0x05) ; Kana
@@ -108,10 +110,12 @@ pub const REPORT_MAP: &[u8] = hid!(
 	(REPORT_SIZE, 0x08),      //   REPORT_SIZE(8)
 	(LOGICAL_MINIMUM, 0x00),  //   LOGICAL_MINIMUM(0)
 	(LOGICAL_MAXIMUM, 0x65),  //   LOGICAL_MAXIMUM(0x65) ; 101 keys
+
 	(USAGE_PAGE, 0x07),       //   USAGE_PAGE (Kbrd/Keypad)
 	(USAGE_MINIMUM, 0x00),    //   USAGE_MINIMUM (0)
 	(USAGE_MAXIMUM, 0x65),    //   USAGE_MAXIMUM (0x65)
 	(HIDINPUT, 0x00),         //   INPUT (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
+
 	(END_COLLECTION),         // END_COLLECTION
 	// ------------------------------------------------- Media Keys
 	(USAGE_PAGE, 0x0C),         // USAGE_PAGE (Consumer)
