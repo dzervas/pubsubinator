@@ -8,6 +8,12 @@ use reactor::*;
 use crate::gpio::{Drive, Input, Level, Output, Pull};
 use crate::keymap_mid::*;
 use crate::matrix::{Matrix, MatrixDirection};
+use crate::hid;
+
+pub trait ConfigBuilder {
+	type Output;
+	fn build(&self) -> Self::Output;
+}
 
 #[derive(Debug, Default)]
 pub struct KeymapConfig {
@@ -15,8 +21,9 @@ pub struct KeymapConfig {
 	pub hold_cycles: u16,
 }
 
-impl KeymapConfig {
-	pub fn build(&self) -> Keymap {
+impl ConfigBuilder for KeymapConfig {
+	type Output = Keymap;
+	fn build(&self) -> Self::Output {
 		let layers = self
 			.layers
 			.iter()
@@ -43,8 +50,9 @@ pub struct MatrixConfig {
 	pub direction: &'static str,
 }
 
-impl MatrixConfig {
-	pub fn build(&self) -> Matrix<Input, Output> {
+impl ConfigBuilder for MatrixConfig {
+	type Output = Matrix<'static, Input<'static>, Output<'static>>;
+	fn build(&self) -> Self::Output {
 		let inputs = self.inputs.iter().map(|input| input.to_input()).collect::<Vec<Input>>();
 		let outputs = self
 			.outputs
@@ -112,5 +120,16 @@ impl MatrixConfigOutputsType {
 		let anypin = unsafe { embassy_nrf::gpio::AnyPin::steal(port * 32 + pin) };
 
 		embassy_nrf::gpio::Output::new(anypin, level.into(), drive.into())
+	}
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct HidConfig {
+	pub descriptors: Vec<&'static str>,
+}
+
+impl ConfigBuilder for HidConfig {
+	type Output = ();
+	fn build(&self) -> Self::Output {
 	}
 }

@@ -48,10 +48,12 @@ pub mod keymap_mid;
 pub mod matrix;
 pub mod nrf;
 pub mod usb_hid;
+pub mod hid;
 
 #[allow(unused_imports)]
 use crate::analog_nrf::Analog;
 use crate::ble_hid::{ble_hid_task, BleHid};
+use crate::config_types::ConfigBuilder;
 use crate::nrf::{usb_init, usb_task};
 use crate::usb_hid::UsbHid;
 
@@ -200,10 +202,10 @@ async fn main(spawner: Spawner) {
 	let sd = Softdevice::enable(&sd_config);
 
 	// --- Setup EKV DB ---
-	let mut flash = make_static!(flash_nrf::Flash::new().await);
+	let flash = make_static!(flash_nrf::Flash::new().await);
 	let mut db_config = ekv::Config::default();
 	db_config.random_seed = 0xDEADBEEF;
-	let mut db = make_static!(ekv::Database::<_, CriticalSectionRawMutex>::new(flash, db_config));
+	let db = make_static!(ekv::Database::<_, CriticalSectionRawMutex>::new(flash, db_config));
 
 	#[cfg(feature = "database-format")]
 	{

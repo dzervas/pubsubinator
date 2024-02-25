@@ -10,7 +10,6 @@ use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMu
 use embassy_sync::mutex::Mutex;
 use embassy_sync::pubsub::Subscriber;
 use futures::Future;
-// use heapless::pool::arc::Arc;
 use heapless::String;
 use nrf_softdevice::ble::advertisement_builder::{
 	AdvertisementDataType, Flag, LegacyAdvertisementBuilder, ServiceList, ServiceUuid16,

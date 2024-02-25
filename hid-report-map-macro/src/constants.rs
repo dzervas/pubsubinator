@@ -20,33 +20,33 @@ pub enum CollectionID {
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum UsagePageID {
 	Undefined = 0x00,
-	GenericDesktop = 0x01,
-	SimulationControls = 0x02,
-	VRControls = 0x03,
-	SportControls = 0x04,
-	GameControls = 0x05,
-	GenericDeviceControls = 0x06,
+	GenericDesktop(GenericDesktopUsageID) = 0x01,
+	SimulationControls(SimulationControlsUsageID) = 0x02,
+	VRControls(VRControlsUsageID) = 0x03,
+	SportControls(SportControlsUsageID) = 0x04,
+	GameControls(GameControlsUsageID) = 0x05,
+	GenericDeviceControls(GenericDesktopUsageID) = 0x06,
 	KeyboardKeypad = 0x07,
-	LED = 0x08,
+	LED(LEDUsageID) = 0x08,
 	Button = 0x09,
 	Ordinal = 0x0A,
-	Telephony = 0x0B,
-	Consumer = 0x0C,
-	Digitizer = 0x0D,
-	Haptics = 0x0E,
+	Telephony(TelephonyUsageID) = 0x0B,
+	Consumer(ConsumerUsageID) = 0x0C,
+	Digitizer(DigitizerUsageID) = 0x0D,
+	Haptics(HapticUsageID) = 0x0E,
 	PID = 0x0F, // 	Physical Interface Device = 0xUSB,
 	Unicode = 0x10,
 	// 0x11 Reserved
-	EyeAndHeadTracker = 0x12,
+	EyeAndHeadTracker(EyeAndHeadTrackerUsageID) = 0x12,
 	// 0x13 Reserved
-	AuxilaryDisplay = 0x14,
+	AuxilaryDisplay(AuxilaryDisplayUsageID) = 0x14,
 	// 0x15-0x1F Reserved
 	Sensor = 0x20,
 	// 0x21-0x3F Reserved
-	MedicalInstrument = 0x40,
-	BrailleDisplay = 0x41,
+	MedicalInstrument(MedicalInstrumentUsageID) = 0x40,
+	BrailleDisplay(BrailleDisplayUsageID) = 0x41,
 	// 0x42-0x58 Reserved
-	LightingAndIllumination = 0x59,
+	LightingAndIllumination(LightingAndIlluminationUsageID) = 0x59,
 	// 0x5A-0x7F Reserved
 	Monitor0x80 = 0x80,
 	Monitor0x81 = 0x81,
@@ -61,11 +61,11 @@ pub enum UsagePageID {
 	Scale = 0x8D,
 	MagneticStripeReader = 0x8E,
 	ReservedPointOfSale = 0x8F,
-	CameraControl = 0x90,
+	CameraControl(CameraControlUsageID) = 0x90,
 	Arcade = 0x91,
 	GamingDevice = 0x92,
 	// 0x93-0xF1CF Reserved
-	FIDOAlliance = 0xF1D0,
+	FIDOAlliance(FIDOAllianceUsageID) = 0xF1D0,
 	// 0xF1D1-0xFEFF Reserved
 	// NOTE: 0xFF00-0xFFFF are Vendor Defined
 }
