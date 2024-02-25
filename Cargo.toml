@@ -1,4 +1,4 @@
-workspace = { members = ["hid-report-map-macro"] }
+workspace = { members = ["hid-descriptors"] }
 [package]
 name = "pubsubinator"
 edition = "2021"

@@ -48,7 +48,6 @@ pub mod keymap_mid;
 pub mod matrix;
 pub mod nrf;
 pub mod usb_hid;
-pub mod hid;
 
 #[allow(unused_imports)]
 use crate::analog_nrf::Analog;

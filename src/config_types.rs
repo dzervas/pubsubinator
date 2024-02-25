@@ -8,7 +8,6 @@ use reactor::*;
 use crate::gpio::{Drive, Input, Level, Output, Pull};
 use crate::keymap_mid::*;
 use crate::matrix::{Matrix, MatrixDirection};
-use crate::hid;
 
 pub trait ConfigBuilder {
 	type Output;
@@ -123,13 +122,13 @@ impl MatrixConfigOutputsType {
 	}
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct HidConfig {
-	pub descriptors: Vec<&'static str>,
-}
+// #[derive(Debug, Clone, Default)]
+// pub struct HidConfig {
+// 	pub descriptors: Vec<&'static str>,
+// }
 
-impl ConfigBuilder for HidConfig {
-	type Output = ();
-	fn build(&self) -> Self::Output {
-	}
-}
+// impl ConfigBuilder for HidConfig {
+// 	type Output = ();
+// 	fn build(&self) -> Self::Output {
+// 	}
+// }
