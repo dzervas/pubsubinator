@@ -23,6 +23,7 @@ use nrf_softdevice::ble::{
 };
 use nrf_softdevice::Softdevice;
 use static_cell::make_static;
+use ssmarshal::serialize;
 use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
 
 use defmt::*;
@@ -316,16 +317,6 @@ impl HIDService {
 	}
 
 	pub async fn send_report(&self, report: &KeyboardReport) {
-		let report_bytes = [
-			report.modifier,
-			0,
-			report.keycodes[0],
-			report.keycodes[1],
-			report.keycodes[2],
-			report.keycodes[3],
-			report.keycodes[4],
-			report.keycodes[5],
-		];
 		let active_conn = self.active_conn_handle.lock().await;
 		if active_conn.is_none() {
 			info!("No active connection");
@@ -334,6 +325,10 @@ impl HIDService {
 
 		let conn = Connection::from_handle(active_conn.unwrap()).unwrap();
 		drop(active_conn);
+
+		// TODO: The size needs to be a generic or const
+		let mut report_bytes = [0u8; 9];
+		serialize(&mut report_bytes, report).expect("Failed to serialize report");
 
 		match gatt_server::notify_value(&conn, self.input_keyboard, &report_bytes) {
 			Ok(_) => {},
