@@ -43,7 +43,7 @@ reactor = { version = "0.1.0", path = "reactor" }
 reactor-macros = { version = "0.1.0", path = "reactor-macros" }
 
 # USB
-usb-device = { version = "0.3.1", features = ["defmt"], optional = true }
+usb-device = { version = "0.3.2", features = ["defmt"], optional = true }
 usbd-hid = { version = "0.6.1", optional = true }
 
 # Bluetooth
