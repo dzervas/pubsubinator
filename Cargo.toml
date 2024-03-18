@@ -99,4 +99,4 @@ strip = true
 
 [build-dependencies]
 convert_case = "0.6.0"
-toml = "0.8.10"
+toml = "0.8.12"
