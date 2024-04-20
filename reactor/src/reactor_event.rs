@@ -67,7 +67,7 @@ pub enum ReactorEvent {
 		y: i16,
 		z: i16,
 	},
-	SpaceMouse {
+	Joystick6DoF {
 		x: i16,
 		y: i16,
 		z: i16,

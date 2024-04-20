@@ -1479,6 +1479,7 @@ dependencies = [
  "rand",
  "reactor",
  "reactor-macros",
+ "serde",
  "ssmarshal",
  "static_cell",
  "strum",

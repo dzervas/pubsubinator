@@ -107,7 +107,7 @@ impl<'a> Polled for Analog<'a, 6> {
 		Box::pin(async {
 			if let Some(buf) = self._poll_internal().await {
 				self.channel
-					.publish(ReactorEvent::SpaceMouse {
+					.publish(ReactorEvent::Joystick6DoF {
 						x: buf[0],
 						y: buf[1],
 						z: buf[2],

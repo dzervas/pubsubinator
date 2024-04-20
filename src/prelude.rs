@@ -8,5 +8,5 @@ pub use defmt::info;
 pub use embassy_executor::Spawner;
 pub use embassy_nrf::saadc;
 pub use crate::*;
-pub use reactor_macros::subscribers_task_env;
+pub use reactor_macros::{subscribers_task, subscribers_task_env};
 pub use static_cell::make_static;

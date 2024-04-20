@@ -47,6 +47,7 @@ pub mod matrix;
 pub mod nrf;
 pub mod prelude;
 pub mod usb_hid;
+pub mod report_maps;
 
 bind_interrupts!(struct Irqs {
 	USBD => usb::InterruptHandler<peripherals::USBD>;

@@ -20,12 +20,12 @@ pub struct UsbHid {
 }
 
 impl UsbHid {
-	pub fn new(builder: &mut Builder<'static, UsbDriver>) -> Self {
+	pub fn new<D: SerializedDescriptor>(builder: &mut Builder<'static, UsbDriver>) -> Self {
 		info!("Initializing USB HID");
 
 		// Create classes on the builder.
 		let hid_config = embassy_usb::class::hid::Config {
-			report_descriptor: KeyboardReport::desc(),
+			report_descriptor: D::desc(),
 			request_handler: None,
 			poll_ms: 60,
 			max_packet_size: 64,
