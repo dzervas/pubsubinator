@@ -132,3 +132,37 @@ impl MatrixConfigOutputsType {
 // 	fn build(&self) -> Self::Output {
 // 	}
 // }
+
+// #[derive(Debug, Default)]
+// pub struct AnalogConfig {
+// 	pub inputs: Vec<&'static str>,
+// }
+
+// impl ConfigBuilder for AnalogConfig {
+// 	type Output = Analog<'static, 3>;
+// 	fn build(&self) -> Self::Output {
+// 		fn to_analog_in(pin: &'static str) -> embassy_nrf::saadc::AnyInput {
+// 			let parts = pin.split('.');
+// 			let (port, pin) = if let [port_str, pin_str] = parts.into_iter().collect::<Vec<&str>>().as_slice() {
+// 				let port = port_str
+// 					.parse::<u8>()
+// 					.expect(format!("Invalid port number for pin `{}`", pin).as_str());
+// 				let pin = pin_str
+// 					.parse::<u8>()
+// 					.expect(format!("Invalid pin number for pin `{}`", pin).as_str());
+// 				(port, pin)
+// 			} else {
+// 				panic!("Invalid pin format `{}`", pin)
+// 			};
+// 			let anypin = unsafe { embassy_nrf::gpio::AnyPin::steal(port * 32 + pin) };
+
+// 			anypin.into()
+// 		}
+
+// 		let inputs = self.inputs.iter().map(|input| to_analog_in(&input)).collect::<Vec<embassy_nrf::saadc::AnyInput>>();
+// 		let inputs_slice = inputs.as_slice();
+
+// 		let p_saadc = unsafe { embassy_nrf::peripherals::SAADC::steal() };
+// 		Analog::new(p_saadc, inputs)
+// 	}
+// }

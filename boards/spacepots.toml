@@ -1,0 +1,30 @@
+[global]
+name = "SpacePots"
+version = "1.0.0"
+serial = "123456"
+
+features = [
+	"nrf52840",
+	"ble",
+	"usb"
+]
+
+# Publishers/Subscribers configuration
+publishers = [ "analog" ]
+middleware = [ "keyboard_report" ]
+subscribers = [ "ble_hid", "usb_hid" ]
+# nrf_softdevice = true
+
+[analog]
+inputs = [
+	"0.03",
+	"0.04",
+]
+
+[matrix]
+inputs = []
+outputs = []
+direction = "Row2Col"
+
+[keymap]
+layers = []
