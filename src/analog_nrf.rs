@@ -111,9 +111,9 @@ impl<'a> Polled for Analog<'a, 6> {
 						x: buf[0],
 						y: buf[1],
 						z: buf[2],
-						a: buf[3],
-						b: buf[4],
-						c: buf[5],
+						rx: buf[3],
+						ry: buf[4],
+						rz: buf[5],
 					})
 					.await;
 			}

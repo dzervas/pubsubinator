@@ -71,9 +71,9 @@ pub enum ReactorEvent {
 		x: i16,
 		y: i16,
 		z: i16,
-		a: i16,
-		b: i16,
-		c: i16,
+		rx: i16,
+		ry: i16,
+		rz: i16,
 	},
 
 	// Battery percentage report
@@ -96,6 +96,7 @@ pub enum ReactorEvent {
 	HardwareMappedBool(bool, usize, usize),
 	HardwareMappedU8(u8, usize, usize),
 	HardwareMappedU16(u16, usize, usize),
+	Analog6Axis(i16, i16, i16, i16, i16, i16),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Format, EnumString)]

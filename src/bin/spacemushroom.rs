@@ -9,7 +9,7 @@ use pubsubinator::prelude::*;
 async fn main(spawner: Spawner) {
 	let p = init();
 	// --- Setup Keyboard Report middleware ---
-	let keyboard_report = make_static!(keyboard_report_mid::KeyboardReportMid::default());
+	let joystick_report = make_static!(joystick_6dof_mid::Joystick6DOFMid::default());
 
 	// --- Setup Analog publisher ---
 	let analog = make_static!(Analog::new(p.SAADC, [
@@ -48,6 +48,6 @@ async fn main(spawner: Spawner) {
 	spawner.spawn(softdevice_task(sd)).unwrap();
 	// spawner.spawn(ble_hid_task(sd, server, db)).unwrap();
 
-	let subs_task = subscribers_task!(CHANNEL, [usb_hid], [keyboard_report]);
+	let subs_task = subscribers_task!(CHANNEL, [usb_hid], [joystick_report]);
 	spawner.spawn(subs_task).unwrap();
 }

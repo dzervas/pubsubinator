@@ -11,6 +11,7 @@ use static_cell::make_static;
 use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
 
 use crate::nrf::UsbDriver;
+use crate::report_maps::SpaceMouseReport;
 use crate::VBUS_DETECT;
 use reactor::reactor_event::*;
 use reactor::RSubscriber;
@@ -74,7 +75,23 @@ impl RSubscriber for UsbHid {
 						Err(e) => warn!("Error writing to USB HID: {:?}", e),
 					}
 				},
-				_ => {},
+				ReactorEvent::Joystick6DoF { x, y, z, rx, ry, rz } => {
+					let report = SpaceMouseReport {
+						x,
+						y,
+						z,
+						rx,
+						ry,
+						rz,
+						buttons: 0,
+					};
+
+					match self.writer.as_mut().unwrap().write_serialize(&report).await {
+						Ok(_) => {},
+						Err(e) => warn!("Error writing to USB HID: {:?}", e),
+					}
+				}
+				_ => return,
 			}
 		})
 	}
