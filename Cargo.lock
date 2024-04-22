@@ -370,7 +370,7 @@ checksum = "a47c1c47d2f5964e29c61246e81db715514cd532db6b5116a25ea3c03d6780a2"
 [[package]]
 name = "ekv"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/ekv#dac343aa06b5fe35da510ea77a7325720f08047f"
+source = "git+https://github.com/embassy-rs/ekv#557f76dc39e348587fd98324f7ca94ef7bc10ce7"
 dependencies = [
  "defmt",
  "embassy-sync 0.5.0",
