@@ -25,7 +25,7 @@ ekv = { git = "https://github.com/embassy-rs/ekv", version = "0.1.0", features =
 embassy-executor = { version = "0.5.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers", "nightly"] }
 embassy-futures = "0.1.1"
 embassy-sync = "0.6.0"
-embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"] }
+embassy-time = { version = "0.3.1", features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"] }
 embassy-usb = { version = "0.2.0", features = ["defmt"], optional = true }
 
 # Target specific
