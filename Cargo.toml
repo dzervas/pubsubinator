@@ -29,7 +29,7 @@ embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime
 embassy-usb = { version = "0.2.0", features = ["defmt"], optional = true }
 
 # Target specific
-embassy-nrf = { version = "0.1.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time", "qspi-multiwrite-flash"], optional = true }
+embassy-nrf = { version = "0.2.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time", "qspi-multiwrite-flash"], optional = true }
 embassy-rp = { version = "0.1.0", optional = true }
 embassy-stm32 = { version = "0.1.0", optional = true }
 
