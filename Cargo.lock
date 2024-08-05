@@ -529,9 +529,9 @@ dependencies = [
 
 [[package]]
 name = "embassy-rp"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "438f170cbd97d4a870e8d57e1738ee815255028ad31dd409d891e2bf797dc531"
+checksum = "6c5d0300b0ed5229bf1c25488c64c1ce55024c5153c246f378b1f2e353d5ec9a"
 dependencies = [
  "atomic-polyfill",
  "cfg-if",
@@ -539,10 +539,10 @@ dependencies = [
  "cortex-m-rt",
  "critical-section",
  "document-features",
- "embassy-embedded-hal 0.1.0",
+ "embassy-embedded-hal 0.2.0",
  "embassy-futures",
- "embassy-hal-internal 0.1.0",
- "embassy-sync 0.5.0",
+ "embassy-hal-internal 0.2.0",
+ "embassy-sync 0.6.0",
  "embassy-time",
  "embassy-usb-driver",
  "embedded-hal 0.2.7",
@@ -554,7 +554,6 @@ dependencies = [
  "embedded-storage",
  "embedded-storage-async",
  "fixed",
- "futures",
  "nb 1.1.0",
  "pio",
  "pio-proc",
