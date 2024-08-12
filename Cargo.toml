@@ -26,7 +26,7 @@ embassy-executor = { version = "0.6.0", features = ["arch-cortex-m", "executor-t
 embassy-futures = "0.1.1"
 embassy-sync = "0.6.0"
 embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"] }
-embassy-usb = { version = "0.2.0", features = ["defmt"], optional = true }
+embassy-usb = { version = "0.3.0", features = ["defmt"], optional = true }
 
 # Target specific
 embassy-nrf = { version = "0.2.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac", "time", "qspi-multiwrite-flash"], optional = true }
