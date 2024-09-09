@@ -53,7 +53,7 @@ usbd-hid = { version = "0.6", optional = true }
 # Bluetooth
 nrf-softdevice = { version = "0.1.0", features = ["ble-sec", "ble-gatt", "ble-gatt-server", "ble-peripheral", "nrf52840", "ble-l2cap", "defmt", "nrf-softdevice-s140", "critical-section-impl", "s140", "ble-rssi", "usable-from-interrupts", "nrf52840-pac", "ble-gatt-client"], optional = true, default-features = false }
 ssmarshal = { version = "1.0.0", default-features = false }
-serde = { version = "1.0.206", default-features = false }
+serde = { version = "1.0.210", default-features = false }
 
 [features]
 default = [
