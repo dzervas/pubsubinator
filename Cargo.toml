@@ -34,7 +34,7 @@ embassy-rp = { version = "0.2.0", optional = true }
 embassy-stm32 = { version = "0.1.0", optional = true }
 
 # Rust stuff
-futures = { version = "0.3.30", features = ["async-await"], default-features = false }
+futures = { version = "0.3.31", features = ["async-await"], default-features = false }
 fixed = "1.27.0"
 heapless = "0.8.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
