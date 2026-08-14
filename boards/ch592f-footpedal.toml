@@ -1,0 +1,66 @@
+[global]
+name = "Foot Pedal"
+version = "1.0.0"
+serial = "123456"
+
+# Conditional compilation
+features = ["ch592", "usb"]
+
+# Publishers/Subscribers configuration
+publishers = ["matrix"]
+middleware = ["keymap", "keyboard_report"]
+subscribers = ["ble_hid", "usb_hid"]
+
+[matrix]
+inputs = [
+	{ pin = "0.04", pull = "Down" },
+	{ pin = "0.30", pull = "Down" },
+	{ pin = "1.14", pull = "Down" },
+]
+outputs = [
+	{ pin = "0.03", level = "Low", drive = "Standard" },
+	{ pin = "0.28", level = "Low", drive = "Standard" },
+	{ pin = "0.29", level = "Low", drive = "Standard" },
+]
+direction = "Row2Col"
+
+[keymap]
+# period = 2
+layers = [
+	[
+		[
+			"Kb1",
+			"Kb2",
+			"Kb3",
+		],
+		[
+			"Kb4",
+			"Kb5",
+			"Kb6",
+		],
+		[
+			"Kb7",
+			"Kb8",
+			"Kb9",
+		],
+	],
+	[
+		[
+			"Intl1",
+			"Intl2",
+			"Intl3",
+		],
+		[
+			"Intl4",
+			"Intl5",
+			"Intl6",
+		],
+		[
+			"Intl7",
+			"Intl8",
+			"Intl9",
+		],
+	],
+]
+
+# [ble_hid]
